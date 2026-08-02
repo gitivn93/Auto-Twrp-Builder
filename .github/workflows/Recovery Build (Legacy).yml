@@ -22,15 +22,9 @@ on:
 jobs:
   build:
     if: github.event.repository.owner.id == github.event.sender.id
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
-    
-    # Mantenemos el contenedor de Ubuntu 20.04 para salvar la compilación del 12%
-    container:
-      image: ubuntu:20.04
-      options: --user root
-
     steps:
       - name: Display Run Parameters
         run: |
@@ -40,37 +34,39 @@ jobs:
           echo "Build Target: ${{ github.event.inputs.BUILD_TARGET }}.img"
           echo "::endgroup::"
 
-      - name: Install Base Container Tools
-        run: |
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          apt-get install -y git curl wget sudo cpio software-properties-common
-
       - name: Check Out
         uses: actions/checkout@v4
 
+      - name: Cleanup
+        uses: rokibhasansagar/slimhub_actions@main
+
       - name: Prepare the environment
         run: |
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          apt-get -y upgrade
+          sudo apt update
+          sudo apt -y upgrade
           
-          # Descargamos e instalamos "repo" de forma manual y segura antes de las dependencias
-          curl -L https://googleapis.com > /usr/bin/repo
-          chmod a+x /usr/bin/repo
+          # Instalamos dependencias verificadas y compatibles con Ubuntu 24.04 (Limpiado de paquetes obsoletos)
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses6-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static libncurses6 python3 cpio wget
           
-          # Instalamos las dependencias nativas de Ubuntu 20.04 (eliminado repo de la lista apt)
-          apt-get -y install gperf gcc-multilib gcc-10-multilib g++-multilib g++-10-multilib libc6-dev x11proto-core-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libwxgtk3.0-gtk3-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static libstdc++-10-dev libncurses5 python2 python3 python3-pip
+          # Descarga e instalación manual de la herramienta oficial 'repo' evitando fallos de curl viejos
+          sudo curl -L https://googleapis.com > /usr/bin/repo
+          sudo chmod a+x /usr/bin/repo
+
+          # INSTALACIÓN MANUAL DE PYTHON 2 PARA EVITAR ERRORES DE SINTAXIS (PRINT) AL 12%
+          # Descargamos el binario portátil oficial de Python 2.7 y lo enlazamos al sistema
+          curl -L https://github.com | tar -xz
+          sudo cp -r python/bin/* /usr/bin/
+          sudo cp -r python/lib/* /usr/lib/
+          sudo ln -sf /usr/bin/python2.7 /usr/bin/python
           
-          # Enlazamos Python 2 de forma nativa en el sistema
-          ln -sf /usr/bin/python2 /usr/bin/python
-          pip3 install twrpdtgen
+          # Instalamos twrpdtgen de forma aislada en Python 3
+          pip3 install twrpdtgen --break-system-packages
 
       - name: Install OpenJDK
-        run: |
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          apt-get install -y openjdk-8-jdk
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
 
       - name: Setup SSH Keys
         if: ${{ startsWith(github.event.inputs.MANIFEST_URL, 'git@github.com') }}
@@ -115,6 +111,11 @@ jobs:
           repo sync -j$(nproc --all)
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
         continue-on-error: true
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
 
       - name: Building recovery
         run: |
