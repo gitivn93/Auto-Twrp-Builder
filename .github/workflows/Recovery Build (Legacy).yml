@@ -45,21 +45,20 @@ jobs:
           sudo apt update
           sudo apt -y upgrade
           
-          # Instalamos dependencias verificadas y compatibles con Ubuntu 24.04 (Limpiado de paquetes obsoletos)
-          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses6-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static libncurses6 python3 cpio wget
+          # Lista de dependencias nativas limpiadas y verificadas para Ubuntu 24.04 LTS
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget
           
-          # Descarga e instalación manual de la herramienta oficial 'repo' evitando fallos de curl viejos
+          # Descarga e instalación manual de la herramienta oficial 'repo'
           sudo curl -L https://googleapis.com > /usr/bin/repo
           sudo chmod a+x /usr/bin/repo
 
-          # INSTALACIÓN MANUAL DE PYTHON 2 PARA EVITAR ERRORES DE SINTAXIS (PRINT) AL 12%
-          # Descargamos el binario portátil oficial de Python 2.7 y lo enlazamos al sistema
+          # Descarga directa del binario portable de Python 2.7 para resolver el error del 12%
           curl -L https://github.com | tar -xz
           sudo cp -r python/bin/* /usr/bin/
           sudo cp -r python/lib/* /usr/lib/
           sudo ln -sf /usr/bin/python2.7 /usr/bin/python
           
-          # Instalamos twrpdtgen de forma aislada en Python 3
+          # Instalación de twrpdtgen aislada bajo Python 3
           pip3 install twrpdtgen --break-system-packages
 
       - name: Install OpenJDK
