@@ -9,7 +9,7 @@ on:
       MANIFEST_URL:
         description: 'MANIFEST_URL (if want to use SSH keys, use git@github.com:XXXXX)'
         required: true
-        default: 'https://github.com'
+        default: 'https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni'
       MANIFEST_BRANCH:
         description: 'MANIFEST_BRANCH'
         required: true
@@ -45,28 +45,22 @@ jobs:
           sudo apt update
           sudo apt -y upgrade
           
-          # 1. Instalamos las dependencias nativas de compilación oficiales de Ubuntu 24.04
-          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev
+          # 1. Instalamos las dependencias nativas incluyendo "repo" de forma limpia desde el repositorio de Ubuntu
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev repo
           
-          # 2. Descarga e instalación manual de la herramienta oficial 'repo'
-          curl -L https://googleapis.com > repo_launcher
-          sudo mv repo_launcher /usr/bin/repo
-          sudo chmod a+x /usr/bin/repo
-
-          # 3. INSTALACIÓN DE PYTHON 2.7 GARANTIZADA USANDO PYENV (Evita errores de APT)
+          # 2. INSTALACIÓN DE PYTHON 2.7 USANDO PYENV (Evita errores de sintaxis al 12% en Ninja)
           curl https://pyenv.run | bash
           export PATH="$HOME/.pyenv/bin:$PATH"
           eval "$(pyenv init -)"
           
-          # Compila e instala Python 2.7.18 en el entorno local de forma automática
           pyenv install 2.7.18
           pyenv global 2.7.18
           
-          # Creamos el enlace simbólico global para que "python" apunte a esta versión en todo el sistema
+          # Forzamos los enlaces globales del sistema hacia el binario real de Python 2
           sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python
           sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python2
           
-          # 4. Instalamos twrpdtgen de forma aislada en Python 3 nativo
+          # 3. Instalamos twrpdtgen bajo Python 3 nativo de forma aislada
           pip3 install twrpdtgen --break-system-packages
 
       - name: Install OpenJDK
@@ -90,7 +84,9 @@ jobs:
           echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
           git config --global user.name "azwhikaru"
           git config --global user.email "azwhikaru+37921907@github.com"
-          repo init --depth=1 -u ${{ github.event.inputs.MANIFEST_URL }} -b ${{ github.event.inputs.MANIFEST_BRANCH }}
+          
+          # Llamamos al comando oficial nativo de Ubuntu
+          /usr/bin/repo init --depth=1 -u ${{ github.event.inputs.MANIFEST_URL }} -b ${{ github.event.inputs.MANIFEST_BRANCH }}
 
       - name: Check Build Tree
         uses: haya14busa/action-cond@v1
@@ -102,9 +98,8 @@ jobs:
 
       - name: Repo Sync
         run: |
-          # Aseguramos que la sesión del paso actual también reconozca el Python 2 de pyenv
           export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
-          repo sync -j$(nproc --all) --force-sync
+          /usr/bin/repo sync -j$(nproc --all) --force-sync
         working-directory: workspace
 
       - name: Generate Device Tree
@@ -118,7 +113,7 @@ jobs:
         run: |
           bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ steps.gdt.outputs.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
           export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
-          repo sync -j$(nproc --all)
+          /usr/bin/repo sync -j$(nproc --all)
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
         continue-on-error: true
 
@@ -129,7 +124,6 @@ jobs:
 
       - name: Building recovery
         run: |
-          # Forzamos que la fase de compilación final use obligatoriamente el entorno de Python 2
           export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
