@@ -45,21 +45,23 @@ jobs:
           sudo apt update
           sudo apt -y upgrade
           
-          # Lista de dependencias nativas verificadas para Ubuntu 24.04 LTS
-          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget
+          # Añadimos repositorios universales para asegurar que Ubuntu localice Python 2 nativo
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository universe -y
+          sudo apt update
+
+          # Lista de dependencias limpia y oficial instalando Python 2 nativo de Ubuntu (python2-minimal)
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget python2-minimal
           
-          # Descarga e instalación manual de la herramienta oficial 'repo' con permisos correctos de root
+          # Descarga e instalación manual de la herramienta oficial 'repo' de forma segura
           curl -L https://googleapis.com > repo_launcher
           sudo mv repo_launcher /usr/bin/repo
           sudo chmod a+x /usr/bin/repo
 
-          # Descarga directa del binario portable de Python 2.7 para resolver el error del 12%
-          curl -L https://github.com | tar -xz
-          sudo cp -r python/bin/* /usr/bin/
-          sudo cp -r python/lib/* /usr/lib/
-          sudo ln -sf /usr/bin/python2.7 /usr/bin/python
+          # SOLUCIÓN DE RAÍZ PARA EL ERROR DEL 12%: Enlazamos el comando global "python" a Python 2 nativo
+          sudo ln -sf /usr/bin/python2 /usr/bin/python
           
-          # Instalación de twrpdtgen aislada bajo Python 3
+          # Instalamos twrpdtgen de forma aislada en Python 3
           pip3 install twrpdtgen --break-system-packages
 
       - name: Install OpenJDK
