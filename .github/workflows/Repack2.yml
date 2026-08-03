@@ -1,0 +1,178 @@
+name: Recovery Build (Legacy)
+on:
+  workflow_dispatch:
+    inputs:
+      IMG_URL:
+        description: 'URL de tu recovery.img Stock (Para firmas)'
+        required: true
+        default: 'https://github.com'
+      MANIFEST_URL:
+        description: 'MANIFEST_URL'
+        required: true
+        default: 'https://github.com'
+      MANIFEST_BRANCH:
+        description: 'MANIFEST_BRANCH'
+        required: true
+        default: 'twrp-9.0'
+      BUILD_TARGET:
+        description: 'BUILD_TARGET'
+        required: true
+        default: 'recovery'
+
+jobs:
+  build:
+    if: github.event.repository.owner.id == github.event.sender.id
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Display Run Parameters
+        run: |
+          echo "::group::User Environment Variables"
+          echo "Manifest URL: ${{ github.event.inputs.MANIFEST_URL }}"
+          echo "Manifest Branch: ${{ github.event.inputs.MANIFEST_BRANCH }}"
+          echo "Build Target: ${{ github.event.inputs.BUILD_TARGET }}.img"
+          echo "::endgroup::"
+
+      - name: Check Out
+        uses: actions/checkout@v4
+
+      - name: Cleanup
+        uses: rokibhasansagar/slimhub_actions@main
+
+      - name: Prepare the environment
+        run: |
+          sudo apt update
+          sudo apt -y upgrade
+          
+          # Dependencias nativas oficiales para Ubuntu 24.04 LTS
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev repo
+          
+          # Enlaces de compatibilidad para Clang Host
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncursesw.so.6 /usr/lib/x86_64-linux-gnu/libncursesw.so.5
+          sudo ln -sf /usr/lib/i386-linux-gnu/libtinfo.so.6 /usr/lib/i386-linux-gnu/libtinfo.so.5 || true
+          sudo ln -sf /usr/lib/i386-linux-gnu/libncurses.so.6 /usr/lib/i386-linux-gnu/libncurses.so.5 || true
+
+          # Instalación limpia de Python 2.7 a través de Pyenv
+          curl https://pyenv.run | bash
+          export PATH="$HOME/.pyenv/bin:$PATH"
+          eval "$(pyenv init -)"
+          pyenv install 2.7.18
+          pyenv global 2.7.18
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python2
+          
+          pip3 install twrpdtgen --break-system-packages
+
+      - name: Install OpenJDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+
+      - name: Initialize repo
+        id: pwd
+        run: |
+          mkdir workspace
+          cd workspace
+          echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
+          git config --global user.name "azwhikaru"
+          git config --global user.email "azwhikaru+37921907@github.com"
+          /usr/bin/repo init --depth=1 -u ${{ github.event.inputs.MANIFEST_URL }} -b ${{ github.event.inputs.MANIFEST_BRANCH }}
+
+      - name: Check Build Tree
+        uses: haya14busa/action-cond@v1
+        id: buildtree
+        with:
+          cond: ${{ github.event.inputs.MANIFEST_BRANCH == 'twrp-11' || github.event.inputs.MANIFEST_BRANCH == 'twrp-12.1' }}
+          if_true: twrp
+          if_false: omni
+
+      - name: Repo Sync
+        run: |
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
+          /usr/bin/repo sync -j$(nproc --all) --force-sync
+        working-directory: workspace
+
+      - name: Generate Device Tree
+        id: gdt
+        run: |
+          wget "${{ github.event.inputs.IMG_URL }}" -O stock_recovery.img
+          python3 ${GITHUB_WORKSPACE}/scripts/build.py -i stock_recovery.img -o device
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
+      - name: Sync Device Dependencies
+        run: |
+          bash ${GITHUB_WORKSPACE}/scripts/convert.sh device/*/*/*.dependencies || true
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
+          /usr/bin/repo sync -j$(nproc --all)
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+        continue-on-error: true
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
+
+      - name: Building recovery
+        run: |
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
+          source build/envsetup.sh
+          export ALLOW_MISSING_DEPENDENCIES=true
+          
+          # Modificamos de forma dinámica el BoardConfig.mk de la carpeta real clonada (alps)
+          BOARD_CONFIG_FILE=$(find device/ -name "BoardConfig.mk" | head -n 1)
+          if [ -f "$BOARD_CONFIG_FILE" ]; then
+            echo "::group::Modificando BoardConfig.mk de forma agresiva"
+            sed -i 's/BOARD_RECOVERYIMAGE_PARTITION_SIZE :=.*/BOARD_RECOVERYIMAGE_PARTITION_SIZE := 12657568/g' "$BOARD_CONFIG_FILE"
+            echo "LZMA_RAMDISK := true" >> "$BOARD_CONFIG_FILE"
+            echo "TW_INCLUDE_CRYPTO := false" >> "$BOARD_CONFIG_FILE"
+            echo "TW_EXCLUDE_SUPERSU := true" >> "$BOARD_CONFIG_FILE"
+            echo "TW_EXCLUDE_MTP := true" >> "$BOARD_CONFIG_FILE"
+            echo "::endgroup::"
+          fi
+          
+          # Forzamos el almuerzo usando el nombre correcto reportado (alps)
+          lunch omni_alps-eng || lunch ${{ steps.gdt.outputs.MAKEFILE_NAME }}-eng
+          make clean
+          make ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
+          
+          # Proceso de estampado de firmas MediaTek clonando el molde Stock
+          OUTPUT_DIR="out/target/product/alps"
+          NEW_IMG="$OUTPUT_DIR/recovery.img"
+          STOCK_IMG="stock_recovery.img"
+          FINAL_IMG="$OUTPUT_DIR/recovery_signed.img"
+          
+          if [ -f "$NEW_IMG" ] && [ -f "$STOCK_IMG" ]; then
+            echo "::group::Aplicando molde de firmas nativo MediaTek"
+            cp "$STOCK_IMG" "$FINAL_IMG"
+            dd if="$NEW_IMG" of="$FINAL_IMG" bs=512 seek=1 conv=notrunc
+            STOCK_SIZE=$(stat -c%s "$STOCK_IMG")
+            dd if="$STOCK_IMG" of="$FINAL_IMG" bs=1 skip=$((STOCK_SIZE - 1024)) seek=$((STOCK_SIZE - 1024)) count=1024 conv=notrunc
+            cp "$FINAL_IMG" "$NEW_IMG"
+            echo "::endgroup::"
+            
+            FINAL_SIZE=$(stat -c%s "$NEW_IMG")
+            echo "=========================================================="
+            echo "Límite de tu partición física: 12,657,568 bytes"
+            echo "Tamaño del nuevo TWRP Firmado generado: $FINAL_SIZE bytes"
+            echo "=========================================================="
+          fi
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            workspace/out/target/product/**/*.img
+            workspace/out/target/product/**/*.zip
+          name: TWRP-9.0-Firmado-Final-${{ github.run_id }}
+          tag_name: final-build-${{ github.run_id }}
+          body: |
+            Compilación completa y firmada con éxito.
+            Dispositivo procesado de forma nativa: alps.
+            Compresión drástica LZMA inyectada para cumplir el límite de 12.6 MB.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
