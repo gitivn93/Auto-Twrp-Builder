@@ -45,23 +45,28 @@ jobs:
           sudo apt update
           sudo apt -y upgrade
           
-          # Añadimos repositorios universales para asegurar que Ubuntu localice Python 2 nativo
-          sudo apt-get install -y software-properties-common
-          sudo add-apt-repository universe -y
-          sudo apt update
-
-          # Lista de dependencias limpia y oficial instalando Python 2 nativo de Ubuntu (python2-minimal)
-          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget python2-minimal
+          # 1. Instalamos las dependencias nativas de compilación oficiales de Ubuntu 24.04
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev
           
-          # Descarga e instalación manual de la herramienta oficial 'repo' de forma segura
+          # 2. Descarga e instalación manual de la herramienta oficial 'repo'
           curl -L https://googleapis.com > repo_launcher
           sudo mv repo_launcher /usr/bin/repo
           sudo chmod a+x /usr/bin/repo
 
-          # SOLUCIÓN DE RAÍZ PARA EL ERROR DEL 12%: Enlazamos el comando global "python" a Python 2 nativo
-          sudo ln -sf /usr/bin/python2 /usr/bin/python
+          # 3. INSTALACIÓN DE PYTHON 2.7 GARANTIZADA USANDO PYENV (Evita errores de APT)
+          curl https://pyenv.run | bash
+          export PATH="$HOME/.pyenv/bin:$PATH"
+          eval "$(pyenv init -)"
           
-          # Instalamos twrpdtgen de forma aislada en Python 3
+          # Compila e instala Python 2.7.18 en el entorno local de forma automática
+          pyenv install 2.7.18
+          pyenv global 2.7.18
+          
+          # Creamos el enlace simbólico global para que "python" apunte a esta versión en todo el sistema
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python2
+          
+          # 4. Instalamos twrpdtgen de forma aislada en Python 3 nativo
           pip3 install twrpdtgen --break-system-packages
 
       - name: Install OpenJDK
@@ -97,6 +102,8 @@ jobs:
 
       - name: Repo Sync
         run: |
+          # Aseguramos que la sesión del paso actual también reconozca el Python 2 de pyenv
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
           repo sync -j$(nproc --all) --force-sync
         working-directory: workspace
 
@@ -110,6 +117,7 @@ jobs:
       - name: Sync Device Dependencies
         run: |
           bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ steps.gdt.outputs.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
           repo sync -j$(nproc --all)
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
         continue-on-error: true
@@ -121,6 +129,8 @@ jobs:
 
       - name: Building recovery
         run: |
+          # Forzamos que la fase de compilación final use obligatoriamente el entorno de Python 2
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
           lunch ${{ steps.gdt.outputs.MAKEFILE_NAME }}-eng
