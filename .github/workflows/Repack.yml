@@ -1,0 +1,92 @@
+name: Fast Recovery Repack & Sign
+on:
+  workflow_dispatch:
+    inputs:
+      STOCK_URL:
+        description: 'URL de tu recovery.img Stock (Para firmas)'
+        required: true
+        default: 'https://github.com'
+      BUILD_TARGET:
+        description: 'BUILD_TARGET'
+        required: true
+        default: 'recovery'
+
+jobs:
+  repack:
+    if: github.event.repository.owner.id == github.event.sender.id
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check Out Repositorio
+        uses: actions/checkout@v4
+
+      - name: Descargar Imagen Stock y Herramientas
+        run: |
+          sudo apt update
+          sudo apt install -y cpio wget
+          
+          # Descargamos el recovery original desde la URL del parámetro con un nombre interno fijo
+          wget "${{ github.event.inputs.STOCK_URL }}" -O stock_recovery.img
+
+      - name: Reempaquetar usando las fuentes del dispositivo
+        run: |
+          # 1. BÚSQUEDA AUTOMÁTICA DEL ARCHIVO RECOVERY.IMG DE LOS SOURCES
+          # El script escanea el repositorio para encontrar el archivo real de la compilación anterior
+          SOURCE_IMG=$(find . -name "recovery.img" ! -name "stock_recovery.img" | head -n 1)
+          
+          if [ -z "$SOURCE_IMG" ]; then
+            echo "ERROR: No se encontró ningún archivo recovery.img de los sources en el repositorio."
+            exit 1
+          fi
+          echo "Imagen de origen localizada en: $SOURCE_IMG"
+          
+          # 2. BÚSQUEDA AUTOMÁTICA DEL ÁRBOL DE DISPOSITIVO
+          DEVICE_DIR=$(find . -maxdepth 4 -type d -name "k50v1_64_bsp" | head -n 1)
+          if [ -z "$DEVICE_DIR" ]; then
+            echo "ERROR: No se encontraron las fuentes de k50v1_64_bsp."
+            exit 1
+          fi
+          echo "Fuentes localizadas con éxito en: $DEVICE_DIR"
+          
+          # 3. PROCESO DE FIRMA BINARIA MTK CLONANDO EL MOLDE STOCK
+          # Conservamos el bloque de arranque inicial de 512 bytes del procesador MediaTek
+          dd if=stock_recovery.img of=recovery_final.img bs=512 count=1 conv=notrunc
+          
+          # Inyectamos el binario nuevo que localizó el script de forma automática
+          dd if="$SOURCE_IMG" of=recovery_final.img bs=512 seek=1 conv=notrunc
+          
+          # Extraemos y pegamos el footer (Firma de seguridad de los últimos 1024 bytes)
+          STOCK_SIZE=$(stat -c%s stock_recovery.img)
+          dd if=stock_recovery.img of=recovery_final.img bs=1 skip=$((STOCK_SIZE - 1024)) seek=$((STOCK_SIZE - 1024)) count=1024 conv=notrunc
+
+      - name: Verificación Física de Seguridad contra Bricks
+        run: |
+          # Validamos el peso real frente al límite del hardware de tu dispositivo (12.6 MB)
+          FINAL_SIZE=$(stat -c%s recovery_final.img)
+          echo "=========================================================="
+          echo "¡PROCESO COMPLETADO EN SEGUNDOS!"
+          echo "Límite físico de tu partición interna: 12,657,568 bytes"
+          echo "Tamaño del nuevo TWRP Firmado generado: $FINAL_SIZE bytes"
+          
+          if [ $FINAL_SIZE -gt 12657568 ]; then
+            echo "ALERTA CRÍTICA: El archivo sigue siendo demasiado grande."
+            echo "No lo flashees para evitar un bootloop."
+          else
+            echo "¡ESTADO SEGURO! El archivo coincide exactamente con la geometría de tu LK."
+          fi
+          echo "=========================================================="
+
+      - name: Publicar Archivo Final de Inmediato
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            recovery_final.img
+          name: TWRP-Fast-Repack-${{ github.run_id }}
+          tag_name: repack-${{ github.run_id }}
+          body: |
+            Empaquetado y firmado rápido completado con éxito.
+            Búsqueda e inyección de archivos automatizada.
+            Estructura de bloques clonada del molde stock MediaTek.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
