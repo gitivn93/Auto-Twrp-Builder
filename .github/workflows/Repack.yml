@@ -24,39 +24,55 @@ jobs:
       - name: Descargar Imagen Stock y Herramientas
         run: |
           sudo apt update
-          sudo apt install -y cpio wget
+          sudo apt install -y cpio wget gh
           
-          # Descargamos el recovery original desde la URL del parámetro con un nombre interno fijo
+          # 1. Descargamos el recovery original desde la URL con un nombre fijo
           wget "${{ github.event.inputs.STOCK_URL }}" -O stock_recovery.img
 
-      - name: Reempaquetar usando las fuentes del dispositivo
+      - name: Descargar y Extraer el TWRP desde Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. BÚSQUEDA AUTOMÁTICA DEL ARCHIVO RECOVERY.IMG DE LOS SOURCES
-          # El script escanea el repositorio para encontrar el archivo real de la compilación anterior
-          SOURCE_IMG=$(find . -name "recovery.img" ! -name "stock_recovery.img" | head -n 1)
+          # 2. Localizamos el último lanzamiento en Releases de tu repositorio
+          echo "Buscando el último lanzamiento en Releases..."
+          LATEST_TAG=$(gh release list --limit 1 | awk '{print $1}')
           
-          if [ -z "$SOURCE_IMG" ]; then
-            echo "ERROR: No se encontró ningún archivo recovery.img de los sources en el repositorio."
+          if [ -z "$LATEST_TAG" ]; then
+            echo "ERROR: No se encontró ningún lanzamiento en la sección Releases de tu repositorio."
             exit 1
           fi
-          echo "Imagen de origen localizada en: $SOURCE_IMG"
+          echo "Último lanzamiento detectado con el tag: $LATEST_TAG"
           
-          # 2. BÚSQUEDA AUTOMÁTICA DEL ÁRBOL DE DISPOSITIVO
-          DEVICE_DIR=$(find . -maxdepth 4 -type d -name "k50v1_64_bsp" | head -n 1)
-          if [ -z "$DEVICE_DIR" ]; then
-            echo "ERROR: No se encontraron las fuentes de k50v1_64_bsp."
+          # 3. Descargamos el archivo comprimido del Source Code generado por la compilación anterior
+          mkdir -p twrp_sources
+          gh release download "$LATEST_TAG" --archive=zip --dest twrp_sources
+          
+          # 4. Descomprimimos las fuentes dentro de la máquina virtual
+          cd twrp_sources
+          unzip -q *.zip
+          
+          # 5. Buscamos el binario real de TWRP generado en la fase OUT de los fuentes extraídos
+          TWRP_BIN=$(find . -name "recovery.img" | head -n 1)
+          if [ -z "$TWRP_BIN" ]; then
+            echo "ERROR: No se encontró el binario recovery.img compilado dentro de tus fuentes de Release."
             exit 1
           fi
-          echo "Fuentes localizadas con éxito en: $DEVICE_DIR"
           
-          # 3. PROCESO DE FIRMA BINARIA MTK CLONANDO EL MOLDE STOCK
+          # Lo movemos a la raíz principal de trabajo externa
+          cp "$TWRP_BIN" ../compiled_twrp.img
+          cd ..
+          echo "¡Binario real de TWRP rescatado con éxito!"
+
+      - name: Reempaquetar y Firmar Binario MTK Real
+        run: |
+          # 6. PROCESO DE FIRMA BINARIA MTK CLONANDO EL MOLDE STOCK
           # Conservamos el bloque de arranque inicial de 512 bytes del procesador MediaTek
           dd if=stock_recovery.img of=recovery_final.img bs=512 count=1 conv=notrunc
           
-          # Inyectamos el binario nuevo que localizó el script de forma automática
-          dd if="$SOURCE_IMG" of=recovery_final.img bs=512 seek=1 conv=notrunc
+          # Inyectamos el binario real de TWRP que acabamos de rescatar del ZIP
+          dd if=compiled_twrp.img of=recovery_final.img bs=512 seek=1 conv=notrunc
           
-          # Extraemos y pegamos el footer (Firma de seguridad de los últimos 1024 bytes)
+          # Extraemos y pegamos el footer (Firma de seguridad de los últimos 1024 bytes del stock)
           STOCK_SIZE=$(stat -c%s stock_recovery.img)
           dd if=stock_recovery.img of=recovery_final.img bs=1 skip=$((STOCK_SIZE - 1024)) seek=$((STOCK_SIZE - 1024)) count=1024 conv=notrunc
 
@@ -82,11 +98,11 @@ jobs:
         with:
           files: |
             recovery_final.img
-          name: TWRP-Fast-Repack-${{ github.run_id }}
-          tag_name: repack-${{ github.run_id }}
+          name: TWRP-Firmado-Final-${{ github.run_id }}
+          tag_name: final-${{ github.run_id }}
           body: |
-            Empaquetado y firmado rápido completado con éxito.
-            Búsqueda e inyección de archivos automatizada.
-            Estructura de bloques clonada del molde stock MediaTek.
+            ¡Recovery final listo para flashear!
+            Binario extraído de forma segura de los fuentes del Release anterior.
+            Encabezados, geometrías y firmas clonados del molde original de MediaTek.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
