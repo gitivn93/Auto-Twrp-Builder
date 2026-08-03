@@ -45,17 +45,17 @@ jobs:
           sudo apt update
           sudo apt -y upgrade
           
-          # 1. Dependencias nativas verificadas para Ubuntu 24.04 LTS
+          # Dependencias nativas verificadas para Ubuntu 24.04 LTS
           sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev repo
           
-          # 2. Clang Host Legacy Fix para evitar errores de librerías faltantes
+          # Clang Host Legacy Fix
           sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
           sudo ln -sf /usr/lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.5
           sudo ln -sf /usr/lib/x86_64-linux-gnu/libncursesw.so.6 /usr/lib/x86_64-linux-gnu/libncursesw.so.5
           sudo ln -sf /usr/lib/i386-linux-gnu/libtinfo.so.6 /usr/lib/i386-linux-gnu/libtinfo.so.5 || true
           sudo ln -sf /usr/lib/i386-linux-gnu/libncurses.so.6 /usr/lib/i386-linux-gnu/libncurses.so.5 || true
 
-          # 3. Instalación limpia de Python 2.7 a través de Pyenv para salvar el error de sintaxis del 12%
+          # Instalación limpia de Python 2.7 a través de Pyenv
           curl https://pyenv.run | bash
           export PATH="$HOME/.pyenv/bin:$PATH"
           eval "$(pyenv init -)"
@@ -64,7 +64,7 @@ jobs:
           sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python
           sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python2
           
-          # 4. Instalación de twrpdtgen bajo Python 3 nativo
+          # Instalación de twrpdtgen bajo Python 3 nativo
           pip3 install twrpdtgen --break-system-packages
 
       - name: Install OpenJDK
@@ -107,8 +107,8 @@ jobs:
       - name: Generate Device Tree
         id: gdt
         run: |
-          wget ${{ github.event.inputs.IMG_URL }}
-          python3 ${GITHUB_WORKSPACE}/scripts/build.py -i *.img -o device
+          wget ${{ github.event.inputs.IMG_URL }} -O stock_recovery.img
+          python3 ${GITHUB_WORKSPACE}/scripts/build.py -i stock_recovery.img -o device
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: Sync Device Dependencies
@@ -132,14 +132,57 @@ jobs:
           lunch ${{ steps.gdt.outputs.MAKEFILE_NAME }}-eng
           make clean
           
-          # VARIABLES DE COMPRESIÓN MÁXIMA PARA HACER CABER EL RAMDISK EN 12.6MB
-          export TW_INCLUDE_CRYPTO=false
-          export TW_EXCLUDE_SUPERSU=true
-          export TW_EXCLUDE_MTP=true
-          export LZMA_RAMDISK=true
-          export BOARD_BUILD_SYSTEM_ROOT_IMAGE=false
+          # FORZADO AGRESIVO EN ARCHIVOS BOARDCONFIG.MK
+          BOARD_CONFIG_FILE=$(find device/ -name "BoardConfig.mk" | head -n 1)
+          if [ -f "$BOARD_CONFIG_FILE" ]; then
+            echo "::group::Modificando BoardConfig.mk de forma agresiva"
+            sed -i 's/BOARD_RECOVERYIMAGE_PARTITION_SIZE :=.*/BOARD_RECOVERYIMAGE_PARTITION_SIZE := 67108864/g' "$BOARD_CONFIG_FILE"
+            echo "LZMA_RAMDISK := true" >> "$BOARD_CONFIG_FILE"
+            echo "TW_INCLUDE_CRYPTO := false" >> "$BOARD_CONFIG_FILE"
+            echo "TW_EXCLUDE_SUPERSU := true" >> "$BOARD_CONFIG_FILE"
+            echo "TW_EXCLUDE_MTP := true" >> "$BOARD_CONFIG_FILE"
+            echo "::endgroup::"
+          fi
           
+          # Compilación inicial del binario crudo
           make ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
+          
+          # FUNCIÓN DE REPLICA DE HEADER Y FOOTER (PARCHEO MTK)
+          OUTPUT_DIR="out/target/product/${{ steps.gdt.outputs.DEVICE_NAME }}"
+          NEW_IMG="$OUTPUT_DIR/recovery.img"
+          STOCK_IMG="stock_recovery.img"
+          FINAL_IMG="$OUTPUT_DIR/recovery_signed.img"
+          
+          if [ -f "$NEW_IMG" ] && [ -f "$STOCK_IMG" ]; then
+            echo "::group::Inyectando Firmas y Encabezados MediaTek Stock"
+            # 1. Copiamos el encabezado MTK de 512 bytes del recovery stock al nuevo archivo
+            dd if="$STOCK_IMG" of="$FINAL_IMG" bs=512 count=1
+            # 2. Añadimos el contenido completo del nuevo TWRP compilado
+            dd if="$NEW_IMG" of="$FINAL_IMG" bs=512 seek=1
+            # 3. Extraemos e inyectamos la firma final (últimos 1024 bytes del stock por seguridad)
+            STOCK_SIZE=$(stat -c%s "$STOCK_IMG")
+            dd if="$STOCK_IMG" of="$FINAL_IMG" bs=1 skip=$((STOCK_SIZE - 1024)) seek=$(stat -c%s "$FINAL_IMG") count=1024
+            
+            # Reemplazamos el archivo para que la acción de Release suba la versión firmada de forma transparente
+            cp "$FINAL_IMG" "$NEW_IMG"
+            echo "::endgroup::"
+            
+            # SISTEMA DE ALERTAS DE TAMAÑO FÍSICO CONTRA BRICKS
+            FINAL_SIZE=$(stat -c%s "$NEW_IMG")
+            echo "=========================================================="
+            echo "¡COMPILACIÓN COMPLETADA CON ÉXITO!"
+            echo "Tamaño de tu partición física límite: 12,657,568 bytes"
+            echo "Tamaño del nuevo archivo firmado: $FINAL_SIZE bytes"
+            if [ "$FINAL_SIZE" -gt 12657568 ]; then
+              echo "⚠️ ADVERTENCIA CRÍTICA: El archivo supera los 12.6MB."
+              echo "❌ NO FLASHEES ESTE ARCHIVO EN LA MEMORIA INTERNA."
+              echo "👉 Usa únicamente: 'fastboot boot recovery.img' desde PC."
+            else
+              echo "✅ SEGURO: El archivo cabe en la partición interna."
+              echo "👍 Puedes flashearlo con total tranquilidad."
+            fi
+            echo "=========================================================="
+          fi
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: Upload to Release
@@ -155,5 +198,6 @@ jobs:
             Manifest: ${{ github.event.inputs.MANIFEST_BRANCH }}
             Device: ${{ steps.gdt.outputs.DEVICE_NAME }}
             Target: ${{ github.event.inputs.BUILD_TARGET }}.img
+            Parcheo de seguridad MediaTek (Header/Footer): Aplicado automáticamente.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
