@@ -91,19 +91,19 @@ jobs:
           # 1. Descargamos el recovery stock original para las firmas posteriores
           wget "${{ github.event.inputs.STOCK_URL }}" -O stock_recovery.img
           
-          # 2. Localizamos el tag del último Release donde guardamos tus fuentes reales
-          echo "Buscando tus fuentes guardadas en Releases..."
-          LATEST_TAG=$(gh release list --limit 1 | grep "sources-" | awk '{print $1}' | head -n 1)
+          # 2. EXTRAE LA ETIQUETA REAL (TAG EN MINÚSCULAS) EVITANDO EL ERROR 404
+          echo "Buscando la etiqueta técnica de tus fuentes..."
+          REAL_TAG=$(gh release list --limit 10 | grep "sources-" | awk '{for(i=1;i<=NF;i++) if($i ~ /^sources-/) print $i}' | head -n 1)
           
-          if [ -z "$LATEST_TAG" ]; then
-            echo "ERROR: No se encontró ningún Release válido de fuentes (sources-xxx)."
+          if [ -z "$REAL_TAG" ]; then
+            echo "ERROR: No se encontró la etiqueta 'sources-xxx' en la lista de Releases."
             exit 1
           fi
-          echo "Lanzamiento de fuentes localizado: $LATEST_TAG"
+          echo "Etiqueta técnica localizada con éxito: $REAL_TAG"
           
-          # 3. Descargamos los assets de las fuentes clonadas directamente al directorio correcto de Android
+          # 3. Descargamos los assets usando la etiqueta técnica correcta
           mkdir -p device/alps/k50v1_64_bsp
-          gh release download "$LATEST_TAG" --dir device/alps/k50v1_64_bsp
+          gh release download "$REAL_TAG" --dir device/alps/k50v1_64_bsp
           
           echo "Árbol de dispositivo restaurado con éxito en: device/alps/k50v1_64_bsp/"
           ls -la device/alps/k50v1_64_bsp/
@@ -135,7 +135,7 @@ jobs:
           export TW_USE_TOOLBOX=true
           export TW_CUSTOM_THEME=""
           
-          # RESTRICCIÓN DE IDIOMAS SOLICITADA: Únicamente Inglés y Español
+          # RESTRICCIÓN DE IDIOMAS: Únicamente Inglés y Español
           export TW_INCLUDE_LANGUAGE_ZONE="en_US es_ES"
           
           # 3. FORZADO DE COMPRESIÓN MÁXIMA EN BAJO NIVEL (LZMA Nivel 9)
