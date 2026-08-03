@@ -1,0 +1,189 @@
+name: Empaquetar TWRP Definitivo
+on:
+  workflow_dispatch:
+    inputs:
+      STOCK_URL:
+        description: 'URL de tu recovery.img Stock (Para firmas)'
+        required: true
+        default: 'https://github.com'
+      MANIFEST_URL:
+        description: 'MANIFEST_URL'
+        required: true
+        default: 'https://github.com'
+      MANIFEST_BRANCH:
+        description: 'MANIFEST_BRANCH'
+        required: true
+        default: 'twrp-9.0'
+      BUILD_TARGET:
+        description: 'BUILD_TARGET'
+        required: true
+        default: 'recovery'
+
+jobs:
+  build:
+    if: github.event.repository.owner.id == github.event.sender.id
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Display Run Parameters
+        run: |
+          echo "::group::User Environment Variables"
+          echo "Manifest URL: ${{ github.event.inputs.MANIFEST_URL }}"
+          echo "Manifest Branch: ${{ github.event.inputs.MANIFEST_BRANCH }}"
+          echo "Build Target: ${{ github.event.inputs.BUILD_TARGET }}.img"
+          echo "::endgroup::"
+
+      - name: Check Out
+        uses: actions/checkout@v4
+
+      - name: Cleanup
+        uses: rokibhasansagar/slimhub_actions@main
+
+      - name: Prepare the environment
+        run: |
+          sudo apt update
+          sudo apt -y upgrade
+          
+          # Dependencias nativas oficiales para Ubuntu 24.04 LTS
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev repo zip gh
+          
+          # Enlaces de compatibilidad para Clang Host
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncursesw.so.6 /usr/lib/x86_64-linux-gnu/libncursesw.so.5
+
+          # Instalación limpia de Python 2.7 a través de Pyenv
+          curl https://pyenv.run | bash
+          export PATH="$HOME/.pyenv/bin:$PATH"
+          eval "$(pyenv init -)"
+          pyenv install 2.7.18
+          pyenv global 2.7.18
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python2
+
+      - name: Install OpenJDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+
+      - name: Initialize repo
+        id: pwd
+        run: |
+          mkdir workspace
+          cd workspace
+          echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
+          git config --global user.name "azwhikaru"
+          git config --global user.email "azwhikaru+37921907@github.com"
+          /usr/bin/repo init --depth=1 -u ${{ github.event.inputs.MANIFEST_URL }} -b ${{ github.event.inputs.MANIFEST_BRANCH }}
+
+      - name: Repo Sync
+        run: |
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
+          /usr/bin/repo sync -j$(nproc --all) --force-sync
+        working-directory: workspace
+
+      - name: Descargar e Inyectar Sources Guardados desde Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Descargamos el recovery stock original para las firmas posteriores
+          wget "${{ github.event.inputs.STOCK_URL }}" -O stock_recovery.img
+          
+          # 2. Localizamos el tag del último Release donde guardamos tus fuentes reales
+          echo "Buscando tus fuentes guardadas en Releases..."
+          LATEST_TAG=$(gh release list --limit 1 | grep "sources-" | awk '{print $1}' | head -n 1)
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "ERROR: No se encontró ningún Release válido de fuentes (sources-xxx)."
+            exit 1
+          fi
+          echo "Lanzamiento de fuentes localizado: $LATEST_TAG"
+          
+          # 3. Descargamos los assets de las fuentes clonadas directamente al directorio correcto de Android
+          mkdir -p device/alps/k50v1_64_bsp
+          gh release download "$LATEST_TAG" --dir device/alps/k50v1_64_bsp
+          
+          echo "Árbol de dispositivo restaurado con éxito en: device/alps/k50v1_64_bsp/"
+          ls -la device/alps/k50v1_64_bsp/
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
+
+      - name: Building recovery
+        run: |
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
+          source build/envsetup.sh
+          export ALLOW_MISSING_DEPENDENCIES=true
+          
+          # 1. PARCHEO DINÁMICO DE RESTRICCIONES DE TAMAÑO EN LOS PLANOS ASOCIADOS
+          find device/ -name "*.mk" -o -name "BoardConfig.mk" | while read -r file; do
+            sed -i 's/BOARD_RECOVERYIMAGE_PARTITION_SIZE :=.*/BOARD_RECOVERYIMAGE_PARTITION_SIZE := 12657568/g' "$file"
+            sed -i 's/BOARD_BOOTIMAGE_PARTITION_SIZE :=.*/BOARD_BOOTIMAGE_PARTITION_SIZE := 12657568/g' "$file"
+          done
+          
+          # 2. VARIABLES DE RECORTE MASIVO (Poda de la interfaz gráfica de TWRP)
+          export TW_EXCLUDE_TWRPAPP=true
+          export TW_EXCLUDE_ENCRYPTED_BACKUPS=true
+          export TW_NO_REBOOT_BOOTLOADER=true
+          export TW_NO_REBOOT_RECOVERY=true
+          export TW_INCLUDE_NTFS_3G=false
+          export TW_USE_TOOLBOX=true
+          export TW_CUSTOM_THEME=""
+          
+          # RESTRICCIÓN DE IDIOMAS SOLICITADA: Únicamente Inglés y Español
+          export TW_INCLUDE_LANGUAGE_ZONE="en_US es_ES"
+          
+          # 3. FORZADO DE COMPRESIÓN MÁXIMA EN BAJO NIVEL (LZMA Nivel 9)
+          export LZMA_RAMDISK=true
+          export MINIGZIP="lzma -9"
+          export BOARD_CUSTOM_BOOTIMG_MK=""
+          
+          # Almuerzo de compilación directo usando tus planos restaurados
+          lunch omni_k50v1_64_bsp-eng || lunch omni_alps-eng
+          make clean
+          make ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
+          
+          # 4. FUNCIÓN DE REPLICA DE FIRMAS SECUENCIALES MEDIATEK STOCK
+          OUTPUT_DIR="out/target/product/k50v1_64_bsp"
+          [ ! -d "$OUTPUT_DIR" ] && OUTPUT_DIR="out/target/product/alps"
+          
+          NEW_IMG="$OUTPUT_DIR/recovery.img"
+          STOCK_IMG="stock_recovery.img"
+          FINAL_IMG="$OUTPUT_DIR/recovery_signed.img"
+          
+          if [ -f "$NEW_IMG" ] && [ -f "$STOCK_IMG" ]; then
+            echo "::group::Inyectando Firmas y Encabezados MediaTek"
+            cp "$STOCK_IMG" "$FINAL_IMG"
+            dd if="$NEW_IMG" of="$FINAL_IMG" bs=512 seek=1 conv=notrunc
+            STOCK_SIZE=$(stat -c%s "$STOCK_IMG")
+            dd if="$STOCK_IMG" of="$FINAL_IMG" bs=1 skip=$((STOCK_SIZE - 1024)) seek=$((STOCK_SIZE - 1024)) count=1024 conv=notrunc
+            cp "$FINAL_IMG" "$NEW_IMG"
+            echo "::endgroup::"
+            
+            FINAL_SIZE=$(stat -c%s "$NEW_IMG")
+            echo "=========================================================="
+            echo "Límite de tu partición física: 12,657,568 bytes"
+            echo "Tamaño del nuevo TWRP Firmado generado: $FINAL_SIZE bytes"
+            echo "=========================================================="
+          fi
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
+      - name: Upload Final Image to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            workspace/out/target/product/**/*.img
+          name: TWRP-9.0-Firmado-Final-${{ github.run_id }}
+          tag_name: final-build-${{ github.run_id }}
+          body: |
+            Compilación final optimizada en peso.
+            Fuentes leídas directamente desde tus assets asegurados en el Release anterior.
+            Idiomas conservados: Inglés y Español.
+            Compresión forzada: LZMA Nivel 9.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
