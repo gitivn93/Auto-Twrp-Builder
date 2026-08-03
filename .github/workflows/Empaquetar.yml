@@ -91,22 +91,28 @@ jobs:
           # 1. Descargamos el recovery stock original para las firmas posteriores
           wget "${{ github.event.inputs.STOCK_URL }}" -O stock_recovery.img
           
-          # 2. EXTRAE LA ETIQUETA REAL (TAG EN MINÚSCULAS) EVITANDO EL ERROR 404
-          echo "Buscando la etiqueta técnica de tus fuentes..."
+          # 2. Extraemos la etiqueta técnica de tus fuentes guardadas
           REAL_TAG=$(gh release list --limit 10 | grep "sources-" | awk '{for(i=1;i<=NF;i++) if($i ~ /^sources-/) print $i}' | head -n 1)
           
           if [ -z "$REAL_TAG" ]; then
             echo "ERROR: No se encontró la etiqueta 'sources-xxx' en la lista de Releases."
             exit 1
           fi
-          echo "Etiqueta técnica localizada con éxito: $REAL_TAG"
           
-          # 3. Descargamos los assets usando la etiqueta técnica correcta
+          # 3. Descargamos los assets de las fuentes clonadas directamente al directorio
           mkdir -p device/alps/k50v1_64_bsp
           gh release download "$REAL_TAG" --dir device/alps/k50v1_64_bsp
           
-          echo "Árbol de dispositivo restaurado con éxito en: device/alps/k50v1_64_bsp/"
-          ls -la device/alps/k50v1_64_bsp/
+          # SOLUCIÓN AL ERROR DE NINJA: ACOMODAR EL KERNEL EN LA SUB_CARPETA PREBUILT
+          # Creamos el directorio prebuilt requerido por el BoardConfig.mk
+          mkdir -p device/alps/k50v1_64_bsp/prebuilt
+          
+          # Movemos de forma segura el kernel y el dtbo a su subcarpeta correspondiente
+          [ -f device/alps/k50v1_64_bsp/kernel ] && mv device/alps/k50v1_64_bsp/kernel device/alps/k50v1_64_bsp/prebuilt/kernel
+          [ -f device/alps/k50v1_64_bsp/dtbo.img ] && mv device/alps/k50v1_64_bsp/dtbo.img device/alps/k50v1_64_bsp/prebuilt/dtbo.img
+          
+          echo "Árbol de dispositivo reestructurado con éxito:"
+          ls -la device/alps/k50v1_64_bsp/prebuilt/
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: Set Swap Space
@@ -182,7 +188,7 @@ jobs:
           tag_name: final-build-${{ github.run_id }}
           body: |
             Compilación final optimizada en peso.
-            Fuentes leídas directamente desde tus assets asegurados en el Release anterior.
+            Rutas prebuilt del Kernel acomodadas automáticamente.
             Idiomas conservados: Inglés y Español.
             Compresión forzada: LZMA Nivel 9.
         env:
