@@ -1,4 +1,4 @@
-name: Recovery Build (Legacy)
+name: Recovery Build and Repack Definitivo
 on:
   workflow_dispatch:
     inputs:
