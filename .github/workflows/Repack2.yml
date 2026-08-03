@@ -1,4 +1,4 @@
-name: Recovery Build and Repack Definitivo
+name: Recovery Build Definitivo
 on:
   workflow_dispatch:
     inputs:
