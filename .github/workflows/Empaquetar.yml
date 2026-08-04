@@ -1,4 +1,4 @@
-name: CoNPilar TWRP Final
+name: Empaquetar TWRP Definitivo
 on:
   workflow_dispatch:
     inputs:
@@ -103,7 +103,7 @@ jobs:
           mkdir -p temp_extracted
           gh release download "$REAL_TAG" --dir temp_extracted
           
-          # 4. ORGANIZADOR AUTOMÁTICO INTEGRADO (Creación de estructura estándar de Android)
+          # 4. ORGANIZADOR AUTOMÁTICO INTEGRADO (Creación de la estructura estándar)
           TARGET_TREE="device/alps/k50v1_64_bsp"
           mkdir -p "$TARGET_TREE/prebuilt"
           mkdir -p "$TARGET_TREE/recovery/root"
@@ -122,7 +122,7 @@ jobs:
           cd ..
           rm -rf temp_extracted
           
-          # 5. EMPAQUETADO ESTRUCTURADO EN ZIP PARA TU NUEVO RECOVERY RELEASE
+          # 5. GENERACIÓN DEL ZIP DEL "ARBOLITO" ESTRUCTURADO PARA RELEASES
           zip -r Device_Tree_k50v1_64_bsp.zip device/alps/k50v1_64_bsp
           mv Device_Tree_k50v1_64_bsp.zip ../
           
@@ -140,31 +140,29 @@ jobs:
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
           
-          # 1. ESTABLECER LÍMITE RAZONABLE A LA PARTICIÓN (14 MB = 14680064 BYTES)
-          # Esto modifica físicamente los planos antes de que lunch congele las variables
+          # 1. REMOCIÓN TOTAL DE LÍMITES DE TAMAÑO (Asignamos 64MB lógicos en los ficheros de configuración)
           find device/ -name "*.mk" -o -name "BoardConfig.mk" | while read -r file; do
-            sed -i 's/BOARD_RECOVERYIMAGE_PARTITION_SIZE :=.*/BOARD_RECOVERYIMAGE_PARTITION_SIZE := 14680064/g' "$file"
-            sed -i 's/BOARD_BOOTIMAGE_PARTITION_SIZE :=.*/BOARD_BOOTIMAGE_PARTITION_SIZE := 14680064/g' "$file"
+            sed -i 's/BOARD_RECOVERYIMAGE_PARTITION_SIZE :=.*/BOARD_RECOVERYIMAGE_PARTITION_SIZE := 67108864/g' "$file"
+            sed -i 's/BOARD_BOOTIMAGE_PARTITION_SIZE :=.*/BOARD_BOOTIMAGE_PARTITION_SIZE := 67108864/g' "$file"
           done
           
-          # 2. VARIABLES DE PODA EXTREMA (Fuentes TTF purgadas y Consola SH)
+          # 2. PODA SOLICITADA MANTENIENDO IDIOMAS BÁSICOS
           export TW_DISABLE_TTF=true
           export TW_NO_BASH=true
           export TW_INCLUDE_LANGUAGE_ZONE="en_US es_ES"
           
-          # 3. COMPRESIÓN FORZADA EN BAJO NIVEL (LZMA Nivel 9)
+          # 3. COMPRESIÓN POR DEFECTO PARA PERMITIR EDICIÓN POSTERIOR EN TU PC
           export LZMA_RAMDISK=true
           export MINIGZIP="lzma -9"
           export BOARD_CUSTOM_BOOTIMG_MK=""
           
-          # Almuerzo de compilación y limpieza profunda
           lunch omni_k50v1_64_bsp-eng || lunch omni_alps-eng
           make clean
           
-          # Forzamos los 14MB también en la llamada directa al comando Make por seguridad
-          make ${{ github.event.inputs.BUILD_TARGET }}image BOARD_RECOVERYIMAGE_PARTITION_SIZE=14680064 BOARD_BOOTIMAGE_PARTITION_SIZE=14680064 -j$(nproc --all)
+          # 4. FORZADO DE TAMAÑO ILIMITADO DIRECTAMENTE EN EL COMANDO MAKE GENERAL
+          make ${{ github.event.inputs.BUILD_TARGET }}image BOARD_RECOVERYIMAGE_PARTITION_SIZE=67108864 BOARD_BOOTIMAGE_PARTITION_SIZE=67108864 -j$(nproc --all)
           
-          # 4. FUNCIÓN DE REPLICA DE FIRMAS SECUENCIALES MEDIATEK STOCK
+          # 5. FUNCIÓN DE REPLICA DE FIRMAS SECUENCIALES MEDIATEK STOCK
           OUTPUT_DIR="out/target/product/k50v1_64_bsp"
           [ ! -d "$OUTPUT_DIR" ] && OUTPUT_DIR="out/target/product/alps"
           
@@ -183,8 +181,8 @@ jobs:
             
             FINAL_SIZE=$(stat -c%s "$NEW_IMG")
             echo "=========================================================="
-            echo "Límite de tu partición física original: 12,657,568 bytes"
-            echo "Tamaño del nuevo TWRP Firmado generado: $FINAL_SIZE bytes"
+            echo "Límite físico real de tu teléfono: 12,657,568 bytes"
+            echo "Tamaño de tu nueva imagen cruda sin restricciones: $FINAL_SIZE bytes"
             echo "=========================================================="
           fi
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
@@ -195,11 +193,13 @@ jobs:
           files: |
             Device_Tree_k50v1_64_bsp.zip
             workspace/out/target/product/**/*.img
-          name: TWRP-9.0-Firmado-Final-${{ github.run_id }}
+          name: TWRP-9.0-Ilimitado-Firmado-${{ github.run_id }}
           tag_name: final-build-${{ github.run_id }}
           body: |
-            Compilación completada.
-            Estructura del Device Tree ordenada en un archivo único .zip.
-            Límite forzado a 14 MB aplicando la poda extrema de fuentes TTF.
+            ¡Compilación completa finalizada sin restricciones de tamaño estáticas!
+            
+            Archivos adjuntos en la sección Assets:
+            1. 'Device_Tree_k50v1_64_bsp.zip': Tu árbol de dispositivo ordenado con la estructura jerárquica oficial estándar de Android.
+            2. 'recovery.img' / 'recovery_signed.img': La imagen completa de 23 MB compilada y firmada con la estructura del molde stock de MediaTek. Puedes descargarla para editar sus archivos internos en tu PC de forma manual.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
