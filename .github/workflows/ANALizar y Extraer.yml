@@ -58,22 +58,19 @@ jobs:
           /usr/bin/repo sync -j$(nproc --all) --force-sync
         working-directory: workspace
 
-      - name: Descargamos tus archivos aplanados de la build anterior dentro de una carpeta temporal
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          
-          
-          # 1. Descargamos tus archivos aplanados de la build anterior dentro de una carpeta temporal
-          mkdir -p temp_extracted
-          gh release download sources-30786185689 --repo gitivn93/Auto-Twrp-Builder --dir temp_extracted
+      - name: Descargar el Device Tree maestro
+        run: |      
+          mkdir -p temp_tree
+          gh release download lab-build-30973601644 \
+          --repo gitivn93/Auto-Twrp-Builder \
+          --pattern "Alps_device_tree_complete.tar.gz" \
+          --dir temp_tree
           
 
       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
         run: |
           set -e
           mkdir -p ../snapshot_source/bootable/recovery
-          mkdir -p ../snapshot_source/system/core
           mkdir -p ../snapshot_source/vendor
           mkdir -p ../snapshot_source/build
           mkdir -p ../snapshot_source/external
@@ -88,11 +85,6 @@ jobs:
           cp bootable/recovery/variables.h ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           cp bootable/recovery/Android.* ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           
-          cp -r system/core/init ../snapshot_source/system/core/ 2>/dev/null || true
-          cp -r system/core/fs_mgr ../snapshot_source/system/core/ 2>/dev/null || true
-          cp -r system/vold ../snapshot_source/system/ 2>/dev/null || true
-          cp -r system/extras ../snapshot_source/system/ 2>/dev/null || true
-          
           cp -r vendor/omni ../snapshot_source/vendor/ 2>/dev/null || true
           cp -r build/make ../snapshot_source/build/ 2>/dev/null || true
           cp -r build/soong ../snapshot_source/build/ 2>/dev/null || true
@@ -104,6 +96,7 @@ jobs:
 
       - name: Medir Tamaños
         run: |
+          set -e
           echo "===== DIRECTORY SIZE ====="
 
           echo "===== BOOTABLE/RECOVERY ====="
@@ -126,6 +119,7 @@ jobs:
 
       - name: Añadir Variables TW y BOARD
         run: |
+          set -e
           grep -R "TW_" bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp > tw_variables.txt || true
           grep -R "BOARD_" \
           device/alps/k50v1_64_bsp \
@@ -172,6 +166,7 @@ jobs:
 
       - name: Añadimos Búsquedas
         run: |
+          set -e
           find bootable/recovery \
           -type f \
           -exec sha256sum {} \; \
@@ -191,6 +186,13 @@ jobs:
           -type f \
           | sort \
           > vendor_filelist.txt
+
+          # Crear carpeta de informes
+          mkdir -p analysis_report
+
+          # Mover todos los logs generados
+          find . -maxdepth 1 -name "*.txt" -exec mv {} analysis_report/ \;
+          mkdir -p snapshot_source
 
       - name: Empaquetar Bloques Estructurados de Laboratorio
         run: |
