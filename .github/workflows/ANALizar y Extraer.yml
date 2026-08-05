@@ -220,7 +220,7 @@ jobs:
         with:
           files: |
             analysis_logs.tar.gz
-            source_snapshot.tar.gz
+             source_twrp.tar.gz
           name: LAB-ANALYSIS-ALPS-${{ github.run_id }}
           tag_name: lab-build-${{ github.run_id }}
           body: |
