@@ -93,7 +93,7 @@ jobs:
           cp -r bootable/recovery/gui ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           cp -r bootable/recovery/minui* ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           if [ -d bootable/recovery/res ]; then
-          cp -a bootable/recovery/res analysis_sources/
+          cp -a bootable/recovery/res snapshot_source/
           fi
 
           cp bootable/recovery/twrp.cpp ../snapshot_source/bootable/recovery/ 2>/dev/null || true
