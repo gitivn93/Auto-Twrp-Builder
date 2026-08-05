@@ -58,13 +58,21 @@ jobs:
           /usr/bin/repo sync -j$(nproc --all) --force-sync
         working-directory: workspace
 
-      - name: Descargar el Device Tree maestro
+      - name: Descargar y desempaquetar el Device Tree maestro
         run: |      
           mkdir -p temp_tree
           gh release download lab-build-30973601644 \
           --repo gitivn93/Auto-Twrp-Builder \
           --pattern "Alps_device_tree_complete.tar.gz" \
           --dir temp_tree
+            tar -tzf temp_tree/Alps_device_tree_complete.tar.gz
+
+            echo "===== DEVICE TREE ====="
+
+            find device/alps/k50v1_64_bsp \
+            |maxdepth 2 \
+            |sort \
+            > device_tree_check.txt
           
 
       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
