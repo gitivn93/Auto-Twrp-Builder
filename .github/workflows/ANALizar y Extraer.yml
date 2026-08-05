@@ -82,7 +82,7 @@ jobs:
             fi
           
 
-       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
+      - name: Aislar Módulos Médula de TWRP (Source Snapshot)
         run: |
           set -e
           # Estructuración limpia de rutas absolutas del sistema de snapshot
