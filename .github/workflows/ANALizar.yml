@@ -12,18 +12,23 @@ jobs:
       - name: Check Out Repositorio
         uses: actions/checkout@v4
 
-      - name: Instalar Dependencias de Análisis
+      - name: Instalar Dependencias de Análisis y Configurar Repo Oficial
         run: |
           sudo apt update
-          sudo apt install -y repo wget tree tar software-properties-common
+          sudo apt install -y cpio wget tree tar software-properties-common
+          
+          # Descargamos el binario oficial actualizado que evita el error de la URL rota
+          curl -L https://googleapis.com > repo_launcher
+          sudo mv repo_launcher /usr/bin/repo
+          sudo chmod a+x /usr/bin/repo
 
       - name: Sincronización Inteligente de Fuentes (Mínima y Rápida)
         run: |
           mkdir -p workspace
           cd workspace
           rm -rf .repo/
-          # Forzamos la asignación de la URL limpia directamente en la inicialización global de repo
-          /usr/bin/repo init --depth=1 --manifest-url=https://github.com -b twrp-9.0
+          # Usamos el ejecutable verificado con la URL oficial de tu manifiesto
+          /usr/bin/repo init --depth=1 -u https://github.com -b twrp-9.0
           /usr/bin/repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
 
 
