@@ -5,19 +5,20 @@ on:
 jobs:
   analyze:
     if: github.event.repository.owner.id == github.event.sender.id
-    runs-on: ubuntu-24.04
+    # Forzamos el entorno compatible que sí funcionaba sin el bug de la URL
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
       - name: Check Out Repositorio
         uses: actions/checkout@v4
 
-      - name: Instalar Dependencias de Análisis y Configurar Repo Oficial
+      - name: Instalar Dependencias de Análisis
         run: |
           sudo apt update
           sudo apt install -y cpio wget tree tar software-properties-common
           
-          # Descargamos el binario oficial actualizado que evita el error de la URL rota
+          # Descargamos el launcher oficial directo de Google para evitar bloqueos
           curl -L https://googleapis.com > repo_launcher
           sudo mv repo_launcher /usr/bin/repo
           sudo chmod a+x /usr/bin/repo
@@ -28,19 +29,13 @@ jobs:
           cd workspace
           rm -rf .repo/
           
-          # 1. Forzamos la descarga del binario oficial de Google actualizado sobre la marcha
-          curl -L https://googleapis.com > repo_launcher
-          chmod a+x repo_launcher
-          
-          # 2. Perfil de identidad obligatorio para evitar bloqueos anónimos
+          # Configuración obligatoria de identidad de Git
           git config --global user.name "azwhikaru"
           git config --global user.email "azwhikaru+37921907@github.com"
           
-          # 3. Inicializamos usando nuestro propio binario local verificado sin depender del sistema
-          ./repo_launcher init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
-          
-          # 4. Sincronizamos las carpetas médicas de laboratorio
-          ./repo_launcher sync -c -j$(nproc --all) --no-tags --no-clone-bundle
+          # Inicialización nativa sobre entorno compatible
+          /usr/bin/repo init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
+          /usr/bin/repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
 
 
       - name: Descargar y Reconstruir Árbol de Dispositivo Puro (Geometría TWRP)
