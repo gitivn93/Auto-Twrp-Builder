@@ -65,7 +65,7 @@ jobs:
           --repo gitivn93/Auto-Twrp-Builder \
           --pattern "Alps_device_tree_complete.tar.gz" \
           --dir temp_tree
-            tar -tzf temp_tree/Alps_device_tree_complete.tar.gz
+            tar -xzf temp_tree/Alps_device_tree_complete.tar.gz
 
             echo "===== DEVICE TREE ====="
 
@@ -73,6 +73,13 @@ jobs:
             |maxdepth 2 \
             |sort \
             > device_tree_check.txt
+
+            echo "===== DEVICE TREE RESTAURADO ====="
+            find device/alps/k50v1_64_bsp -maxdepth 2 | sort > device_tree_check.txt
+            if [ ! -f device/alps/k50v1_64_bsp/BoardConfig.mk ]; then
+            echo "ERROR: Device Tree no restaurado correctamente"
+            exit 1
+            fi
           
 
       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
