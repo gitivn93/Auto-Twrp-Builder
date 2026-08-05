@@ -5,80 +5,95 @@ on:
 jobs:
   analyze:
     if: github.event.repository.owner.id == github.event.sender.id
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - name: Check Out Repositorio
+      - name: Check Out
         uses: actions/checkout@v4
 
-      - name: Instalar Dependencias de Análisis y Descargar Comando Puro
+      - name: Prepare the environment
         run: |
           sudo apt update
-          sudo apt install -y cpio wget tree tar software-properties-common
+          sudo apt -y upgrade
           
-          # Purgamos el binario nativo de la máquina para evitar interferencias
-          sudo rm -f /usr/bin/repo
+          # Instalación de dependencias nativas del sistema operando bajo la máquina base
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev repo zip gh
           
-          # Descargamos el ejecutable oficial limpio de Google
-          curl -L https://googleapis.com > git_repo
-          chmod a+x git_repo
+          # Enlaces de compatibilidad para Clang Host
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncursesw.so.6 /usr/lib/x86_64-linux-gnu/libncursesw.so.5
 
-      - name: Sincronización Inteligente de Fuentes (Mínima y Rápida)
-        run: |
-          mkdir -p workspace
-          cd workspace
-          rm -rf .repo/
+          # Configuración e inyección nativa del entorno de Python 2 con Pyenv
+          curl https://pyenv.run | bash
+          export PATH="$HOME/.pyenv/bin:$PATH"
+          eval "$(pyenv init -)"
+          pyenv install 2.7.18
+          pyenv global 2.7.18
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python2
           
-          # Configuración global de identidad obligatoria de Git
+          pip3 install twrpdtgen --break-system-packages
+
+      - name: Install OpenJDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+
+      - name: Initialize repo
+        id: pwd
+        run: |
+          mkdir workspace
+          cd workspace
+          echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
           git config --global user.name "azwhikaru"
           git config --global user.email "azwhikaru+37921907@github.com"
-          
-          # ENLACE INTEGRADO LITERALMENTE: Tu URL exacta de manifiesto para inicializar
-          ../git_repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni -b twrp-9.0 --no-clone-bundle
-          
-          # Clonación de los componentes esenciales del laboratorio
-          ../git_repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
+          /usr/bin/repo init --depth=1 -u https://github.com -b twrp-9.0
 
-      - name: Descargar y Reconstruir Árbol de Dispositivo Puro (Geometría TWRP)
+      - name: Repo Sync
         run: |
-          cd workspace
-          
-          # ENLACE INTEGRADO LITERALMENTE: Tu URL exacta de recovery original para la extracción
-          wget "https://github.com/gitivn93/Auto-Twrp-Builder/raw/refs/heads/master/recovery.img" -O stock_recovery.img
-          
-          # Neutralizamos la llamada oculta de repo para que el script de Python no falle
-          sudo touch /usr/bin/repo
-          sudo chmod +x /usr/bin/repo
-          
-          # Ejecutamos tu script de extracción original (Python volcará los componentes base)
-          python3 ${GITHUB_WORKSPACE}/scripts/build.py -i stock_recovery.img -o device || true
-          
-          # RECONSTRUCCIÓN CON ARQUITECTURA PURA (Estructura formal vacía esperada por TWRP)
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
+          /usr/bin/repo sync -j$(nproc --all) --force-sync
+        working-directory: workspace
+
+      - name: Descargar Assets Sueltos y Reconstruir Árbol de Dispositivo Puro
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Creamos la estructura formal vacía y limpia que espera TWRP
           TARGET_TREE="device/alps/k50v1_64_bsp"
           mkdir -p "$TARGET_TREE/prebuilt"
           mkdir -p "$TARGET_TREE/rootdir"
           mkdir -p "$TARGET_TREE/recovery"
           mkdir -p "$TARGET_TREE/overlay"
           
-          # Clasificación y reubicación quirúrgica de componentes extraídos hacia la jerarquía limpia
-          find device/ -name "kernel" -exec mv {} "$TARGET_TREE/prebuilt/" \; 2>/dev/null || true
-          find device/ -name "dtbo.img" -exec mv {} "$TARGET_TREE/prebuilt/" \; 2>/dev/null || true
-          find device/ -name "recovery.fstab" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "init.recovery.*.rc" -o -name "init.recovery.rc" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "twrp.flags" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "*.mk" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "*.prop" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "*.bp" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "vendorsetup.sh" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "*.dependencies" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
+          # 2. Descargamos tus archivos aplanados de la build anterior dentro de una carpeta temporal
+          mkdir -p temp_extracted
+          gh release download sources-30786185689 --repo gitivn93/Auto-Twrp-Builder --dir temp_extracted
+          
+          # 3. Mapeo y reubicación individual de cada archivo suelto a su directorio correcto
+          [ -f temp_extracted/kernel ] && mv temp_extracted/kernel "$TARGET_TREE/prebuilt/kernel" || true
+          [ -f temp_extracted/dtbo.img ] && mv temp_extracted/dtbo.img "$TARGET_TREE/prebuilt/dtbo.img" || true
+          [ -f temp_extracted/recovery.fstab ] && mv temp_extracted/recovery.fstab "$TARGET_TREE/recovery.fstab" || true
+          [ -f temp_extracted/init.recovery.rc ] && mv temp_extracted/init.recovery.rc "$TARGET_TREE/init.recovery.rc" || true
+          [ -f temp_extracted/twrp.flags ] && mv temp_extracted/twrp.flags "$TARGET_TREE/twrp.flags" || true
+          [ -f temp_extracted/Android.mk ] && mv temp_extracted/Android.mk "$TARGET_TREE/Android.mk" || true
+          [ -f temp_extracted/AndroidProducts.mk ] && mv temp_extracted/AndroidProducts.mk "$TARGET_TREE/AndroidProducts.mk" || true
+          [ -f temp_extracted/BoardConfig.mk ] && mv temp_extracted/BoardConfig.mk "$TARGET_TREE/BoardConfig.mk" || true
+          [ -f temp_extracted/device.mk ] && mv temp_extracted/device.mk "$TARGET_TREE/device.mk" || true
+          [ -f temp_extracted/omni.dependencies ] && mv temp_extracted/omni.dependencies "$TARGET_TREE/omni.dependencies" || true
+          [ -f temp_extracted/vendorsetup.sh ] && mv temp_extracted/vendorsetup.sh "$TARGET_TREE/vendorsetup.sh" || true
+          [ -f temp_extracted/Android.bp ] && mv temp_extracted/Android.bp "$TARGET_TREE/Android.bp" || true
+          
+          # Movemos cualquier archivo secundario .mk, .prop o .rc restante a la raíz por seguridad
+          find temp_extracted/ -name "*.mk" -o -name "*.prop" -o -name "*.rc" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
+          rm -rf temp_extracted
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
-          # Limpieza de residuos sueltos fuera de la estructura limpia de alps
-          find device/ -maxdepth 2 -type d -not -path "device/alps*" -exec rm -rf {} \; 2>/dev/null || true
-
-      - name: Validación de Componentes Médula (Log Integrado en Raíz)
+      - name: Generar Reporte de Validación Interno en la Raíz
         run: |
-          cd workspace
           TARGET_TREE="device/alps/k50v1_64_bsp"
           VALIDATION_LOG="$TARGET_TREE/tree_validation_report.txt"
           
@@ -102,7 +117,7 @@ jobs:
             [ -f "$TARGET_TREE/vendorsetup.sh" ] && echo "✓ vendorsetup.sh ... encontrado" || echo "WARNING: No existe vendorsetup.sh"
             [ -f "$TARGET_TREE/omni.dependencies" ] && echo "✓ omni.dependencies ... encontrado" || echo "WARNING: No existe omni.dependencies"
             [ -f "$TARGET_TREE/Android.bp" ] && echo "✓ Android.bp ... encontrado" || echo "WARNING: No existe Android.bp"
-            [ -f "$TARGET_TREE/init.recovery.rc" ] || [ -f "$TARGET_TREE/rootdir/init.recovery.rc" ] || ls $TARGET_TREE/init.recovery.*.rc >/dev/null 2>&1 && echo "✓ init.recovery.rc ... encontrado" || echo "WARNING: No existe init.recovery.rc"
+            [ -f "$TARGET_TREE/init.recovery.rc" ] && echo "✓ init.recovery.rc ... encontrado" || echo "WARNING: No existe init.recovery.rc"
             [ -f "$TARGET_TREE/twrp.flags" ] && echo "✓ twrp.flags ... encontrado" || echo "WARNING: No existe twrp.flags"
             echo ""
             echo "=========================================================="
@@ -110,10 +125,10 @@ jobs:
           
           mkdir -p ../analysis_report
           cp "$VALIDATION_LOG" ../analysis_report/tree_validation.txt
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: Auditoría de Peso y Métricas Estadísticas
         run: |
-          cd workspace
           TARGET_DIR="device/alps/k50v1_64_bsp"
           NUM_FILES=$(find "$TARGET_DIR" -type f | wc -l)
           NUM_DIRS=$(find "$TARGET_DIR" -type d | wc -l)
@@ -141,15 +156,15 @@ jobs:
             echo "INVENTARIO DE DIVISIONES POR EXTENSIONES:"
             find "$TARGET_DIR" -type f | sed 's/.*\.//' | sort | uniq -c | sort -nr
           } > ../analysis_report/device_tree_stats.txt
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: Generar Mapa Inviolable de Firmas (SHA256 Manifest)
         run: |
-          cd workspace
           find device/alps/k50v1_64_bsp/ -type f -exec sha256sum {} \; | sed 's|device/alps/k50v1_64_bsp/||' > ../analysis_report/sha256_manifest.txt
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
         run: |
-          cd workspace
           mkdir -p ../snapshot_source/bootable/recovery
           mkdir -p ../snapshot_source/system/core
           mkdir -p ../snapshot_source/vendor
@@ -174,12 +189,14 @@ jobs:
           cp -r external/libtar ../snapshot_source/external/ 2>/dev/null || true
           cp -r external/freetype ../snapshot_source/external/ 2>/dev/null || true
           cp -r external/libpng ../snapshot_source/external/ 2>/dev/null || true
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: Empaquetar Bloques Estructurados de Laboratorio
         run: |
-          tar -czf analysis_logs.tar.gz -C analysis_report .
-          tar -czf source_snapshot.tar.gz -C snapshot_source .
-          tar -czf Alps_device_tree.tar.gz -C workspace device/alps/k50v1_64_bsp
+          tar -czf ../analysis_logs.tar.gz -C ../analysis_report .
+          tar -czf ../source_snapshot.tar.gz -C ../snapshot_source .
+          tar -czf ../Alps_device_tree.tar.gz device/alps/k50v1_64_bsp
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: Publicar Lanzamiento de Análisis en Releases
         uses: softprops/action-gh-release@v2
@@ -191,7 +208,3 @@ jobs:
           name: LAB-ANALYSIS-ALPS-${{ github.run_id }}
           tag_name: lab-build-${{ github.run_id }}
           body: |
-            ### 🧪 Laboratorio de Análisis de Entorno e Inventariado Completado
-            
-            Se han generado y empaquetado los componentes esenciales de estudio de forma segura:
-            * **`Alps_device_tree.tar.gz`**: Árbol de dispositivo reconstruido bajo la arquitectura formal exigida por TWRP. Incluye el reporte de validación interno.
