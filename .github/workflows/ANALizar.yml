@@ -28,15 +28,16 @@ jobs:
           cd workspace
           rm -rf .repo/
           
-          # Configuración global del perfil de Git (Obligatoria para evitar el bug de repo)
+          # Configuración del perfil de Git requerida por el entorno
           git config --global user.name "azwhikaru"
           git config --global user.email "azwhikaru+37921907@github.com"
           
-          # Inicializamos apuntando al manifiesto oficial correcto con los permisos de perfil asociados
+          # Inyección directa de la URL oficial fija (Solución definitiva al error de inicialización)
           /usr/bin/repo init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
           
-          # Descarga selectiva de los componentes de análisis
+          # Descarga selectiva de los componentes de análisis de laboratorio
           /usr/bin/repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
+
 
 
       - name: Descargar y Reconstruir Árbol de Dispositivo Puro (Geometría TWRP)
