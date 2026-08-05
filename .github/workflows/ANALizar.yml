@@ -13,15 +13,17 @@ jobs:
       - name: Check Out Repositorio
         uses: actions/checkout@v4
 
-      - name: Instalar Dependencias de Análisis
+      - name: Instalar Dependencias de Análisis y Descargar Comando Puro
         run: |
           sudo apt update
           sudo apt install -y cpio wget tree tar software-properties-common
           
-          # Descargamos el launcher oficial directo de Google para evitar bloqueos
-          curl -L https://googleapis.com > repo_launcher
-          sudo mv repo_launcher /usr/bin/repo
-          sudo chmod a+x /usr/bin/repo
+          # Eliminamos por completo el binario corrupto que viene de fábrica para evitar interferencias
+          sudo rm -f /usr/bin/repo
+          
+          # Descargamos la herramienta oficial de Google limpia y le asignamos un nombre inmune
+          curl -L https://googleapis.com > git_repo
+          chmod a+x git_repo
 
       - name: Sincronización Inteligente de Fuentes (Mínima y Rápida)
         run: |
@@ -29,13 +31,13 @@ jobs:
           cd workspace
           rm -rf .repo/
           
-          # Configuración obligatoria de identidad de Git
+          # Mapeamos la identidad de Git requerida
           git config --global user.name "azwhikaru"
           git config --global user.email "azwhikaru+37921907@github.com"
           
-          # Inicialización nativa sobre entorno compatible
-          /usr/bin/repo init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
-          /usr/bin/repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
+          # Llamamos al comando inmune usando la ruta relativa limpia y la URL oficial de TWRP
+          ../git_repo init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
+          ../git_repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
 
 
       - name: Descargar y Reconstruir Árbol de Dispositivo Puro (Geometría TWRP)
