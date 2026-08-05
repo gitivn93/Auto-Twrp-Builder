@@ -34,48 +34,26 @@ jobs:
           git config --global user.name "azwhikaru"
           git config --global user.email "azwhikaru+37921907@github.com"
           
-          # ENLACE REPARADO: Apuntamos de forma directa al manifiesto formal de TWRP 9.0
+          # ENLACES CORREGIDOS: Sintaxis .git oficial e inmune a bugs de red
           ../git_repo init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
           
           # Clonación de los componentes esenciales del laboratorio
           ../git_repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
 
-
       - name: Descargar y Reconstruir Árbol de Dispositivo Puro (Geometría TWRP)
         run: |
           cd workspace
           
-          # 1. Descargamos el recovery base stock para procesar la extracción
-          wget "https://github.com" -O stock_recovery.img
+          # 1. Descarga corregida con las mayúsculas exactas del repositorio real (Evita el Error 404/HTML)
+          wget "https://github.com/gitivn93/Auto-TWRP-Builder/raw/refs/heads/master/recovery.img" -O stock_recovery.img
           
           # 2. Neutralizamos la llamada oculta de repo para que el script de Python no falle
           sudo touch /usr/bin/repo
           sudo chmod +x /usr/bin/repo
           
-          # 3. Ejecutamos tu script de extracción original (Python volcará los componentes base)
+          # 3. Ejecutamos tu script de extracción original
           python3 ${GITHUB_WORKSPACE}/scripts/build.py -i stock_recovery.img -o device || true
-          
-          # RECONSTRUCCIÓN CON ARQUITECTURA PURA (Estructura formal vacía esperada por TWRP)
-          TARGET_TREE="device/alps/k50v1_64_bsp"
-          mkdir -p "$TARGET_TREE/prebuilt"
-          mkdir -p "$TARGET_TREE/rootdir"
-          mkdir -p "$TARGET_TREE/recovery"
-          mkdir -p "$TARGET_TREE/overlay"
-          
-          # Clasificación y reubicación quirúrgica de componentes extraídos hacia la jerarquía limpia
-          find device/ -name "kernel" -exec mv {} "$TARGET_TREE/prebuilt/" \; 2>/dev/null || true
-          find device/ -name "dtbo.img" -exec mv {} "$TARGET_TREE/prebuilt/" \; 2>/dev/null || true
-          find device/ -name "recovery.fstab" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "init.recovery.*.rc" -o -name "init.recovery.rc" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "twrp.flags" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "*.mk" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "*.prop" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "*.bp" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "vendorsetup.sh" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
-          find device/ -name "*.dependencies" -exec mv {} "$TARGET_TREE/" \; 2>/dev/null || true
 
-          # Limpieza de residuos sueltos fuera de la estructura limpia de alps
-          find device/ -maxdepth 2 -type d -not -path "device/alps*" -exec rm -rf {} \; 2>/dev/null || true
 
       - name: Validación de Componentes Médula (Log Integrado en Raíz)
         run: |
