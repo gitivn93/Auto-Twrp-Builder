@@ -19,11 +19,13 @@ jobs:
 
       - name: Sincronización Inteligente de Fuentes (Mínima y Rápida)
         run: |
-          mkdir workspace
+          mkdir -p workspace
           cd workspace
-          # Inicialización con la URL oficial corregida de la rama de desarrollo
+          # Forzamos la limpieza absoluta de configuraciones corruptas anteriores
+          rm -rf .repo/
+          # Inicialización limpia con el árbol oficial completo
           repo init --depth=1 -u https://github.com -b twrp-9.0
-          # Sincronizamos estrictamente los directorios esenciales declarados para el estudio
+          # Sincronización estricta de componentes
           repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
 
       - name: Descargar y Reconstruir Árbol de Dispositivo Puro (Geometría TWRP)
