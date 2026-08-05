@@ -1,0 +1,89 @@
+name: Workflow A - TWRP Source Analyzer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: write
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+
+        sudo apt install -y \
+          git repo wget tree rsync zip unzip \
+          python3 tar xz-utils lz4 cpio \
+          build-essential jq
+
+    - name: Init repo
+      run: |
+        mkdir workspace
+        cd workspace
+
+        repo init \
+          --depth=1 \
+          -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni \
+          -b twrp-9.0
+
+    - name: Repo sync
+      run: |
+        cd workspace
+        repo sync -c -j$(nproc)
+
+    - name: Download device tree release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+
+        cd workspace
+
+        mkdir device_tree
+
+        gh release download \
+          --repo gitivn93/Auto-Twrp-Builder \
+          --dir device_tree
+
+        echo "Release descargado."
+
+    - name: Rebuild device tree
+      run: |
+
+        cd workspace
+
+        mkdir -p device/alps/k50v1_64_bsp
+
+        find device_tree -type f | while read f
+        do
+
+          base=$(basename "$f")
+
+          case "$base" in
+
+            BoardConfig.mk|device.mk|Android.mk|AndroidProducts.mk)
+              cp "$f" device/alps/k50v1_64_bsp/
+              ;;
+
+            kernel)
+              mkdir -p device/alps/k50v1_64_bsp/prebuilt
+              cp "$f" device/alps/k50v1_64_bsp/prebuilt/
+              ;;
+
+            dtbo.img)
+              mkdir -p device/alps/k50v1_64_bsp/prebuilt
+              cp "$f" device/alps/k50v1_64_bsp/prebuilt/
+              ;;
+
+            *)
+              ;;
+          esac
+
+        done
