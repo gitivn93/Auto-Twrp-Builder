@@ -167,7 +167,7 @@ jobs:
           echo
           echo "===== TW_EXCLUDE_TWRPAPP ====="
           grep -R "TW_EXCLUDE_TWRPAPP" . || true
-
+          
           echo
           echo "===== TW_INCLUDE_NTFS ====="
           grep -R "TW_INCLUDE_NTFS" . || true
@@ -177,50 +177,39 @@ jobs:
           grep -R "TW_INCLUDE_EXFAT" . || true
 
           } > important_flags.txt
+          working-directory: workspace
 
-
-      - name: Añadimos Búsquedas
+      - name: Añadimos Búsquedas y Consolidación de Informes
         run: |
           set -e
-          find bootable/recovery \
-          -type f \
-          -exec sha256sum {} \; \
-          > recovery_sha256.txt
+          find bootable/recovery -type f -exec sha256sum {} \; > recovery_sha256.txt 2>/dev/null || true
+          find vendor/omni/config -type f -exec sha256sum {} \; > vendor_sha256.txt 2>/dev/null || true
 
-          find vendor/omni/config \
-          -type f \
-          -exec sha256sum {} \; \
-          > vendor_sha256.txt
+          find bootable/recovery -type f | sort > recovery_filelist.txt 2>/dev/null || true
+          find vendor/omni/config -type f | sort > vendor_filelist.txt 2>/dev/null || true
 
-          find bootable/recovery \
-          -type f \
-          | sort \
-          > recovery_filelist.txt
-
-          find vendor/omni/config \
-          -type f \
-          | sort \
-          > vendor_filelist.txt
-
-          # Crear carpeta de informes
-          mkdir -p analysis_report
-
-          # Mover todos los logs generados
-          find . -maxdepth 1 -name "*.txt" -exec mv {} analysis_report/ \;
-          mkdir -p snapshot_source
+          # Copiamos todos los archivos de logs generados en los pasos previos a la carpeta central de informes
+          find . -maxdepth 1 -name "*.txt" -exec cp {} ${GITHUB_WORKSPACE}/analysis_report/ \;
+          working-directory: workspace
+          
 
       - name: Empaquetar Bloques Estructurados de Laboratorio
         run: |
-          tar -czf ../analysis_logs.tar.gz -C ../analysis_report .
-          tar -czf ../source_twrp.tar.gz -C ../snapshot_source .
+           tar -czf ${GITHUB_WORKSPACE}/analysis_logs.tar.gz -C ${GITHUB_WORKSPACE}/analysis_report .
+           tar -czf ${GITHUB_WORKSPACE}/source_snapshot.tar.gz -C ${GITHUB_WORKSPACE}/snapshot_source .
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
         
       - name: Publicar Lanzamiento de Análisis en Releases
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             analysis_logs.tar.gz
-             source_twrp.tar.gz
+            source_snapshot.tar.gz
           name: LAB-ANALYSIS-ALPS-${{ github.run_id }}
-          tag_name: lab-build-${{ github.run_id }}
+          tag_name: analysis-${{ github.run_id }}
           body: |
+            Auditoría estructural completada con éxito.
+            Reportes completos de banderas, variables e integridad de hashes.
+            Captura aislada de los módulos core de TWRP lista para estudio local.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
