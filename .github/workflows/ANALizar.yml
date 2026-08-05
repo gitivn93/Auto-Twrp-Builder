@@ -30,15 +30,16 @@ jobs:
           cd workspace
           rm -rf .repo/
           
-          # Configuración global de identidad requerida obligatoriamente por el entorno
+          # Configuración global de identidad obligatoria de Git
           git config --global user.name "azwhikaru"
           git config --global user.email "azwhikaru+37921907@github.com"
           
-          # Inicialización directa e infalible con la URL oficial de tu manifiesto TWRP 9.0
+          # ENLACE REPARADO: Apuntamos de forma directa al manifiesto formal de TWRP 9.0
           ../git_repo init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
           
-          # Clonación superficial rápida de los directorios esenciales del laboratorio
+          # Clonación de los componentes esenciales del laboratorio
           ../git_repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
+
 
       - name: Descargar y Reconstruir Árbol de Dispositivo Puro (Geometría TWRP)
         run: |
