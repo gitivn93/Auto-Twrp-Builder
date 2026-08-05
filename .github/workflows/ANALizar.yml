@@ -28,23 +28,14 @@ jobs:
           cd workspace
           rm -rf .repo/
           
-          # 1. Creamos la estructura oculta de configuración a mano para saltarnos los bugs de "repo init"
-          mkdir -p .repo/manifests
+          # Configuración global del perfil de Git (Obligatoria para evitar el bug de repo)
+          git config --global user.name "azwhikaru"
+          git config --global user.email "azwhikaru+37921907@github.com"
           
-          # 2. Escribimos directamente el archivo XML real apuntando a tu manifiesto oficial de TWRP 9.0
-          cat << 'EOF' > .repo/manifest.xml
-          <?xml version="1.0" encoding="UTF-8"?>
-          <manifest>
-            <remote name="github" fetch="https://github.com" />
-            <manifest-server url="https://github.com" />
-            <default revision="refs/heads/twrp-9.0" remote="github" sync-j="4" />
-          </manifest>
-          EOF
-          
-          # 3. Forzamos la inicialización local directa usando el archivo manual que acabamos de inyectar
+          # Inicializamos apuntando al manifiesto oficial correcto con los permisos de perfil asociados
           /usr/bin/repo init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
           
-          # 4. Sincronizamos los componentes de diagnóstico
+          # Descarga selectiva de los componentes de análisis
           /usr/bin/repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
 
 
