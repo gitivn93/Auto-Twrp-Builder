@@ -1,0 +1,164 @@
+name: ANALizar y Extraer
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    if: github.event.repository.owner.id == github.event.sender.id
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check Out
+        uses: actions/checkout@v4
+
+      - name: Prepare the environment
+        run: |
+          sudo apt update
+          sudo apt -y upgrade
+          
+          # Instalación de dependencias nativas del sistema operando bajo la máquina base
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev repo zip gh
+          
+          # Enlaces de compatibilidad para Clang Host
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncursesw.so.6 /usr/lib/x86_64-linux-gnu/libncursesw.so.5
+
+          # Configuración e inyección nativa del entorno de Python 2 con Pyenv
+          curl https://pyenv.run | bash
+          export PATH="$HOME/.pyenv/bin:$PATH"
+          eval "$(pyenv init -)"
+          pyenv install 2.7.18
+          pyenv global 2.7.18
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python2
+          
+          pip3 install twrpdtgen --break-system-packages
+
+      - name: Install OpenJDK (JAVA JAVITAAAAAA)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+
+      - name: Initialize repo
+        id: pwd
+        run: |
+          mkdir workspace
+          cd workspace
+          echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
+          git config --global user.name "azwhikaru"
+          git config --global user.email "azwhikaru+37921907@github.com"
+          /usr/bin/repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni -b twrp-9.0
+
+      - name: Repo Sync
+        run: |
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
+          /usr/bin/repo sync -j$(nproc --all) --force-sync
+        working-directory: workspace
+
+      - name: Descargamos tus archivos aplanados de la build anterior dentro de una carpeta temporal
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          
+          
+          # 1. Descargamos tus archivos aplanados de la build anterior dentro de una carpeta temporal
+          mkdir -p temp_extracted
+          gh release download sources-30786185689 --repo gitivn93/Auto-Twrp-Builder --dir temp_extracted
+          
+
+      - name: Aislar Módulos Médula de TWRP (Source Snapshot)
+        run: |
+          mkdir -p ../snapshot_source/bootable/recovery
+          mkdir -p ../snapshot_source/system/core
+          mkdir -p ../snapshot_source/vendor
+          mkdir -p ../snapshot_source/build
+          mkdir -p ../snapshot_source/external
+
+          cp -r bootable/recovery/gui ../snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp -r bootable/recovery/minui* ../snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp -a bootable/recovery/res analysis_sources/
+
+          cp bootable/recovery/twrp.cpp ../snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp bootable/recovery/variables.h ../snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp bootable/recovery/Android.* ../snapshot_source/bootable/recovery/ 2>/dev/null || true
+          
+          cp -r system/core/init ../snapshot_source/system/core/ 2>/dev/null || true
+          cp -r system/core/fs_mgr ../snapshot_source/system/core/ 2>/dev/null || true
+          cp -r system/vold ../snapshot_source/system/ 2>/dev/null || true
+          cp -r system/extras ../snapshot_source/system/ 2>/dev/null || true
+          
+          cp -r vendor/omni ../snapshot_source/vendor/ 2>/dev/null || true
+          cp -r build/make ../snapshot_source/build/ 2>/dev/null || true
+          cp -r build/soong ../snapshot_source/build/ 2>/dev/null || true
+          
+          cp -r external/libtar ../snapshot_source/external/ 2>/dev/null || true
+          cp -r external/freetype ../snapshot_source/external/ 2>/dev/null || true
+          cp -r external/libpng ../snapshot_source/external/ 2>/dev/null || true
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
+      - name: Empaquetar Bloques Estructurados de Laboratorio
+        run: |
+          tar -czf ../analysis_logs.tar.gz -C ../analysis_report .
+          tar -czf ../source_snapshot.tar.gz -C ../snapshot_source .
+          tar -czf ../Alps_device_tree.tar.gz device/alps/k50v1_64_bsp
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
+      - name: Medir Tamaños
+        run: |
+          echo "===== DIRECTORY SIZE ====="
+
+          du -sh bootable/recovery/* \
+          | sort -h \
+          > recovery_sizes.txt
+
+          du -sh vendor/omni/config/* \
+          | sort -h \
+          > vendor_sizes.txt
+
+      - name: Añadir Variables TW y BOARD
+        run: |
+          grep -R "TW_" \
+          bootable/recovery \
+          vendor/omni/config \
+          device/alps/k50v1_64_bsp \
+          > tw_variables.txt
+          grep -R "BOARD_" \
+          device/alps/k50v1_64_bsp \
+          > board_variables.txt
+
+
+      - name: Añadimos Búsquedas
+        run: |
+          find bootable/recovery \
+          -type f \
+          -exec sha256sum {} \; \
+          > recovery_sha256.txt
+
+          find vendor/omni/config \
+          -type f \
+          -exec sha256sum {} \; \
+          > vendor_sha256.txt
+
+          find bootable/recovery \
+          -type f \
+          | sort \
+          > recovery_filelist.txt
+
+          find vendor/omni/config \
+          -type f \
+          | sort \
+          > vendor_filelist.txt
+        
+      - name: Publicar Lanzamiento de Análisis en Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            analysis_logs.tar.gz
+            source_snapshot.tar.gz
+            Alps_device_tree.tar.gz
+          name: LAB-ANALYSIS-ALPS-${{ github.run_id }}
+          tag_name: lab-build-${{ github.run_id }}
+          body: |
