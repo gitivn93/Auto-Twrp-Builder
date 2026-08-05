@@ -17,10 +17,10 @@ jobs:
           sudo apt update
           sudo apt install -y cpio wget tree tar software-properties-common
           
-          # Eliminamos el binario nativo corrupto del sistema para evitar interferencias
+          # Purgamos el binario nativo de la máquina para evitar interferencias
           sudo rm -f /usr/bin/repo
           
-          # Descargamos e instalamos la versión oficial y actualizada de Google
+          # Descargamos el ejecutable oficial limpio de Google
           curl -L https://googleapis.com > git_repo
           chmod a+x git_repo
 
@@ -34,24 +34,24 @@ jobs:
           git config --global user.name "azwhikaru"
           git config --global user.email "azwhikaru+37921907@github.com"
           
-          # URL COMPLETA Y VERIFICADA: Apuntamos directamente al manifiesto oficial .git de TWRP 9.0
-          ../git_repo init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
+          # ENLACE INTEGRADO LITERALMENTE: Tu URL exacta de manifiesto para inicializar
+          ../git_repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni -b twrp-9.0 --no-clone-bundle
           
-          # Clonación superficial rápida de los directorios esenciales del laboratorio
+          # Clonación de los componentes esenciales del laboratorio
           ../git_repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
 
       - name: Descargar y Reconstruir Árbol de Dispositivo Puro (Geometría TWRP)
         run: |
           cd workspace
           
-          # 1. Descargamos el recovery base stock corrigiendo las mayúsculas reales de tu repositorio
-          wget "https://github.com" -O stock_recovery.img
+          # ENLACE INTEGRADO LITERALMENTE: Tu URL exacta de recovery original para la extracción
+          wget "https://github.com/gitivn93/Auto-Twrp-Builder/raw/refs/heads/master/recovery.img" -O stock_recovery.img
           
-          # 2. Neutralizamos la llamada oculta de repo para que el script de Python no falle
+          # Neutralizamos la llamada oculta de repo para que el script de Python no falle
           sudo touch /usr/bin/repo
           sudo chmod +x /usr/bin/repo
           
-          # 3. Ejecutamos tu script de extracción original (Python volcará los componentes base)
+          # Ejecutamos tu script de extracción original (Python volcará los componentes base)
           python3 ${GITHUB_WORKSPACE}/scripts/build.py -i stock_recovery.img -o device || true
           
           # RECONSTRUCCIÓN CON ARQUITECTURA PURA (Estructura formal vacía esperada por TWRP)
