@@ -27,8 +27,24 @@ jobs:
           mkdir -p workspace
           cd workspace
           rm -rf .repo/
-          # Usamos el ejecutable verificado con la URL oficial de tu manifiesto
-          /usr/bin/repo init --depth=1 -u https://github.com -b twrp-9.0
+          
+          # 1. Creamos la estructura oculta de configuración a mano para saltarnos los bugs de "repo init"
+          mkdir -p .repo/manifests
+          
+          # 2. Escribimos directamente el archivo XML real apuntando a tu manifiesto oficial de TWRP 9.0
+          cat << 'EOF' > .repo/manifest.xml
+          <?xml version="1.0" encoding="UTF-8"?>
+          <manifest>
+            <remote name="github" fetch="https://github.com" />
+            <manifest-server url="https://github.com" />
+            <default revision="refs/heads/twrp-9.0" remote="github" sync-j="4" />
+          </manifest>
+          EOF
+          
+          # 3. Forzamos la inicialización local directa usando el archivo manual que acabamos de inyectar
+          /usr/bin/repo init --depth=1 -u https://github.com -b twrp-9.0 --no-clone-bundle
+          
+          # 4. Sincronizamos los componentes de diagnóstico
           /usr/bin/repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
 
 
