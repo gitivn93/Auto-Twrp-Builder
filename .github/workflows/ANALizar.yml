@@ -21,12 +21,11 @@ jobs:
         run: |
           mkdir -p workspace
           cd workspace
-          # Forzamos la limpieza absoluta de configuraciones corruptas anteriores
           rm -rf .repo/
-          # Inicialización limpia con el árbol oficial completo
-          repo init --depth=1 -u https://github.com -b twrp-9.0
-          # Sincronización estricta de componentes
-          repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
+          # Forzamos la asignación de la URL limpia directamente en la inicialización global de repo
+          /usr/bin/repo init --depth=1 --manifest-url=https://github.com -b twrp-9.0
+          /usr/bin/repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
+
 
       - name: Descargar y Reconstruir Árbol de Dispositivo Puro (Geometría TWRP)
         run: |
