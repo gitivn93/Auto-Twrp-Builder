@@ -71,6 +71,7 @@ jobs:
 
       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
         run: |
+          set -e
           mkdir -p ../snapshot_source/bootable/recovery
           mkdir -p ../snapshot_source/system/core
           mkdir -p ../snapshot_source/vendor
@@ -79,7 +80,9 @@ jobs:
 
           cp -r bootable/recovery/gui ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           cp -r bootable/recovery/minui* ../snapshot_source/bootable/recovery/ 2>/dev/null || true
+          if [ -d bootable/recovery/res ]; then
           cp -a bootable/recovery/res analysis_sources/
+          fi
 
           cp bootable/recovery/twrp.cpp ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           cp bootable/recovery/variables.h ../snapshot_source/bootable/recovery/ 2>/dev/null || true
@@ -97,37 +100,74 @@ jobs:
           cp -r external/libtar ../snapshot_source/external/ 2>/dev/null || true
           cp -r external/freetype ../snapshot_source/external/ 2>/dev/null || true
           cp -r external/libpng ../snapshot_source/external/ 2>/dev/null || true
-        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
-
-      - name: Empaquetar Bloques Estructurados de Laboratorio
-        run: |
-          tar -czf ../analysis_logs.tar.gz -C ../analysis_report .
-          tar -czf ../source_snapshot.tar.gz -C ../snapshot_source .
-          tar -czf ../Alps_device_tree.tar.gz device/alps/k50v1_64_bsp
-        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+          working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: Medir Tamaños
         run: |
           echo "===== DIRECTORY SIZE ====="
 
-          du -sh bootable/recovery/* \
+          echo "===== BOOTABLE/RECOVERY ====="
+
+          du -sh bootable/recovery/* 2>/dev/null \
           | sort -h \
           > recovery_sizes.txt
 
-          du -sh vendor/omni/config/* \
+          echo "===== VENDOR/OMNI/CONFIG ====="
+
+          du -sh vendor/omni/config/* 2>/dev/null \
           | sort -h \
           > vendor_sizes.txt
 
-      - name: Añadir Variables TW y BOARD
-        run: |
-          grep -R "TW_" \
+          du -sh \
           bootable/recovery \
           vendor/omni/config \
           device/alps/k50v1_64_bsp \
-          > tw_variables.txt
+          > project_sizes.txt
+
+      - name: Añadir Variables TW y BOARD
+        run: |
+          grep -R "TW_" bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp > tw_variables.txt || true
           grep -R "BOARD_" \
           device/alps/k50v1_64_bsp \
-          > board_variables.txt
+          > board_variables.txt || true
+
+          {
+          echo "===== TW_EXTRA_LANGUAGES ====="
+          grep -R "TW_EXTRA_LANGUAGES" . || true
+
+          echo
+          echo "===== TW_INCLUDE_LANGUAGE_ZONE ====="
+          grep -R "TW_INCLUDE_LANGUAGE_ZONE" . || true
+
+          echo
+          echo "===== BOARD_INCLUDE_CMDLINE_TOOLS ====="
+          grep -R "BOARD_INCLUDE_CMDLINE_TOOLS" . || true
+
+          echo
+          echo "===== TW_INCLUDE_CRYPTO ====="
+          grep -R "TW_INCLUDE_CRYPTO" . || true
+
+          echo
+          echo "===== TW_INCLUDE_FBE ====="
+          grep -R "TW_INCLUDE_FBE" . || true
+
+          echo
+          echo "===== TW_INCLUDE_FBE_METADATA_DECRYPT ====="
+          grep -R "TW_INCLUDE_FBE_METADATA_DECRYPT" . || true
+
+          echo
+          echo "===== TW_EXCLUDE_TWRPAPP ====="
+          grep -R "TW_EXCLUDE_TWRPAPP" . || true
+
+          echo
+          echo "===== TW_INCLUDE_NTFS ====="
+          grep -R "TW_INCLUDE_NTFS" . || true
+
+          echo
+          echo "===== TW_INCLUDE_EXFAT ====="
+          grep -R "TW_INCLUDE_EXFAT" . || true
+
+          } > important_flags.txt
 
 
       - name: Añadimos Búsquedas
@@ -151,14 +191,19 @@ jobs:
           -type f \
           | sort \
           > vendor_filelist.txt
+
+      - name: Empaquetar Bloques Estructurados de Laboratorio
+        run: |
+          tar -czf ../analysis_logs.tar.gz -C ../analysis_report .
+          tar -czf ../source_twrp.tar.gz -C ../snapshot_source .
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
         
       - name: Publicar Lanzamiento de Análisis en Releases
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             analysis_logs.tar.gz
             source_snapshot.tar.gz
-            Alps_device_tree.tar.gz
           name: LAB-ANALYSIS-ALPS-${{ github.run_id }}
           tag_name: lab-build-${{ github.run_id }}
           body: |
