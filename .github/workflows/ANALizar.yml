@@ -17,10 +17,10 @@ jobs:
           sudo apt update
           sudo apt install -y cpio wget tree tar software-properties-common
           
-          # Eliminamos el binario nativo corrupto del sistema para evitar interferencias
+          # Purgamos el binario de fábrica corrupto para evitar que intercepte la llamada
           sudo rm -f /usr/bin/repo
           
-          # Descargamos e instalamos de forma independiente la versión oficial y actualizada de Google
+          # Descargamos el ejecutable oficial de Google limpio con un nombre alternativo inmune
           curl -L https://googleapis.com > git_repo
           chmod a+x git_repo
 
@@ -30,7 +30,7 @@ jobs:
           cd workspace
           rm -rf .repo/
           
-          # Configuración global obligatoria del perfil de identidad de Git
+          # Configuración global de identidad requerida obligatoriamente por el entorno
           git config --global user.name "azwhikaru"
           git config --global user.email "azwhikaru+37921907@github.com"
           
@@ -47,14 +47,14 @@ jobs:
           # 1. Descargamos el recovery base stock para procesar la extracción
           wget "https://github.com" -O stock_recovery.img
           
-          # 2. Neutralizamos temporalmente la llamada oculta de repo para que el script de Python no falle
+          # 2. Neutralizamos la llamada oculta de repo para que el script de Python no falle
           sudo touch /usr/bin/repo
           sudo chmod +x /usr/bin/repo
           
           # 3. Ejecutamos tu script de extracción original (Python volcará los componentes base)
           python3 ${GITHUB_WORKSPACE}/scripts/build.py -i stock_recovery.img -o device || true
           
-          # RECONSTRUCCIÓN CON ARQUITECTURA PURA (Estructura formal vacía y formateada esperada por TWRP)
+          # RECONSTRUCCIÓN CON ARQUITECTURA PURA (Estructura formal vacía esperada por TWRP)
           TARGET_TREE="device/alps/k50v1_64_bsp"
           mkdir -p "$TARGET_TREE/prebuilt"
           mkdir -p "$TARGET_TREE/rootdir"
@@ -82,13 +82,11 @@ jobs:
           TARGET_TREE="device/alps/k50v1_64_bsp"
           VALIDATION_LOG="$TARGET_TREE/tree_validation_report.txt"
           
-          # Auditoría lógica con marcado estricto de estado en la raíz del árbol
           {
             echo "=========================================================="
             echo "   INFORME DE VALIDACIÓN DEL RECONSTRUCTED DEVICE TREE"
             echo "=========================================================="
             echo ""
-            
             [ -f "$TARGET_TREE/BoardConfig.mk" ] && echo "✓ BoardConfig.mk ... encontrado" || echo "WARNING: No existe BoardConfig.mk"
             [ -f "$TARGET_TREE/AndroidProducts.mk" ] && echo "✓ AndroidProducts.mk ... encontrado" || echo "WARNING: No existe AndroidProducts.mk"
             [ -f "$TARGET_TREE/recovery.fstab" ] && echo "✓ recovery.fstab ... encontrado" || echo "WARNING: No existe recovery.fstab"
@@ -96,24 +94,20 @@ jobs:
             [ -f "$TARGET_TREE/prebuilt/dtbo.img" ] && echo "✓ dtbo.img ... encontrado" || echo "WARNING: No existe dtbo.img"
             [ -f "$TARGET_TREE/device.mk" ] && echo "✓ device.mk ... encontrado" || echo "WARNING: No existe device.mk"
             [ -f "$TARGET_TREE/Android.mk" ] && echo "✓ Android.mk ... encontrado" || echo "WARNING: No existe Android.mk"
-            
             echo ""
             echo "----------------------------------------------------------"
             echo " ANÁLISIS DE COMPONENTES AUXILIARES DE COLA DE TRABAJO"
             echo "----------------------------------------------------------"
             echo ""
-            
             [ -f "$TARGET_TREE/vendorsetup.sh" ] && echo "✓ vendorsetup.sh ... encontrado" || echo "WARNING: No existe vendorsetup.sh"
             [ -f "$TARGET_TREE/omni.dependencies" ] && echo "✓ omni.dependencies ... encontrado" || echo "WARNING: No existe omni.dependencies"
             [ -f "$TARGET_TREE/Android.bp" ] && echo "✓ Android.bp ... encontrado" || echo "WARNING: No existe Android.bp"
             [ -f "$TARGET_TREE/init.recovery.rc" ] || [ -f "$TARGET_TREE/rootdir/init.recovery.rc" ] || ls $TARGET_TREE/init.recovery.*.rc >/dev/null 2>&1 && echo "✓ init.recovery.rc ... encontrado" || echo "WARNING: No existe init.recovery.rc"
             [ -f "$TARGET_TREE/twrp.flags" ] && echo "✓ twrp.flags ... encontrado" || echo "WARNING: No existe twrp.flags"
-            
             echo ""
             echo "=========================================================="
           } > "$VALIDATION_LOG"
           
-          # Hacemos una copia externa para el contenedor general de reportes
           mkdir -p ../analysis_report
           cp "$VALIDATION_LOG" ../analysis_report/tree_validation.txt
 
@@ -121,7 +115,6 @@ jobs:
         run: |
           cd workspace
           TARGET_DIR="device/alps/k50v1_64_bsp"
-          
           NUM_FILES=$(find "$TARGET_DIR" -type f | wc -l)
           NUM_DIRS=$(find "$TARGET_DIR" -type d | wc -l)
           TOTAL_SIZE=$(du -sh "$TARGET_DIR" | awk '{print $1}')
@@ -163,12 +156,9 @@ jobs:
           mkdir -p ../snapshot_source/build
           mkdir -p ../snapshot_source/external
 
-          # Copias quirúrgicas de componentes analíticos de control
           cp -r bootable/recovery/gui ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           cp -r bootable/recovery/minui* ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           cp bootable/recovery/twrp.cpp ../snapshot_source/bootable/recovery/ 2>/dev/null || true
-          cp bootable/recovery/variables.h ../snapshot_source/bootable/recovery/ 2>/dev/null || true
-
           cp bootable/recovery/variables.h ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           cp bootable/recovery/Android.* ../snapshot_source/bootable/recovery/ 2>/dev/null || true
           
@@ -183,18 +173,12 @@ jobs:
           
           cp -r external/libtar ../snapshot_source/external/ 2>/dev/null || true
           cp -r external/freetype ../snapshot_source/external/ 2>/dev/null || true
-
           cp -r external/libpng ../snapshot_source/external/ 2>/dev/null || true
 
       - name: Empaquetar Bloques Estructurados de Laboratorio
         run: |
-          # 1. Empaquetado de los informes de logs de texto analíticos
           tar -czf analysis_logs.tar.gz -C analysis_report .
-          
-          # 2. Empaquetado del Snapshot seleccionado de la arquitectura TWRP/Omni
           tar -czf source_snapshot.tar.gz -C snapshot_source .
-          
-          # 3. Empaquetado del árbol de dispositivo formal reconstruido (Alps_device_tree.tar.gz)
           tar -czf Alps_device_tree.tar.gz -C workspace device/alps/k50v1_64_bsp
 
       - name: Publicar Lanzamiento de Análisis en Releases
@@ -211,7 +195,3 @@ jobs:
             
             Se han generado y empaquetado los componentes esenciales de estudio de forma segura:
             * **`Alps_device_tree.tar.gz`**: Árbol de dispositivo reconstruido bajo la arquitectura formal exigida por TWRP. Incluye el reporte de validación interno.
-            * **`source_snapshot.tar.gz`**: Instantánea aislada de los componentes lógicos clave de compilación (Freetype, Vold, Init, Mngr, Make).
-            * **`analysis_logs.tar.gz`**: Informes métricos de extensiones, validación de presencia y mapa de firmas estáticas SHA256.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
