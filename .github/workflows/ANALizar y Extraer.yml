@@ -82,102 +82,80 @@ jobs:
             fi
           
 
-      - name: Aislar Módulos Médula de TWRP (Source Snapshot)
+       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
         run: |
           set -e
-          mkdir -p ../snapshot_source/bootable/recovery
-          mkdir -p ../snapshot_source/vendor
-          mkdir -p ../snapshot_source/build
-          mkdir -p ../snapshot_source/external
+          # Estructuración limpia de rutas absolutas del sistema de snapshot
+          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery
+          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/vendor
+          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/build
+          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/external
+          mkdir -p ${GITHUB_WORKSPACE}/analysis_report
 
-          cp -r bootable/recovery/gui ../snapshot_source/bootable/recovery/ 2>/dev/null || true
-          cp -r bootable/recovery/minui* ../snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp -r bootable/recovery/gui ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp -r bootable/recovery/minui* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+          
           if [ -d bootable/recovery/res ]; then
-          cp -a bootable/recovery/res snapshot_source/
+            cp -r bootable/recovery/res ${GITHUB_WORKSPACE}/analysis_report/
           fi
 
-          cp bootable/recovery/twrp.cpp ../snapshot_source/bootable/recovery/ 2>/dev/null || true
-          cp bootable/recovery/variables.h ../snapshot_source/bootable/recovery/ 2>/dev/null || true
-          cp bootable/recovery/Android.* ../snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp bootable/recovery/twrp.cpp ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp bootable/recovery/variables.h ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp bootable/recovery/Android.* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
           
-          cp -r vendor/omni ../snapshot_source/vendor/ 2>/dev/null || true
-          cp -r build/make ../snapshot_source/build/ 2>/dev/null || true
-          cp -r build/soong ../snapshot_source/build/ 2>/dev/null || true
+          cp -r vendor/omni ${GITHUB_WORKSPACE}/snapshot_source/vendor/ 2>/dev/null || true
+          cp -r build/make ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
+          cp -r build/soong ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
           
-          cp -r external/libtar ../snapshot_source/external/ 2>/dev/null || true
-          cp -r external/freetype ../snapshot_source/external/ 2>/dev/null || true
-          cp -r external/libpng ../snapshot_source/external/ 2>/dev/null || true
-          working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+          cp -r external/libtar ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r external/freetype ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r external/libpng ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+        working-directory: workspace
 
       - name: Medir Tamaños
         run: |
           set -e
-          echo "===== DIRECTORY SIZE ====="
+          {
+            echo "===== BOOTABLE/RECOVERY ====="
+            du -sh bootable/recovery/* 2>/dev/null | sort -h
+          } > recovery_sizes.txt
 
-          echo "===== BOOTABLE/RECOVERY ====="
+          {
+            echo "===== VENDOR/OMNI/CONFIG ====="
+            du -sh vendor/omni/config/* 2>/dev/null | sort -h
+          } > vendor_sizes.txt
 
-          du -sh bootable/recovery/* 2>/dev/null \
-          | sort -h \
-          > recovery_sizes.txt
-
-          echo "===== VENDOR/OMNI/CONFIG ====="
-
-          du -sh vendor/omni/config/* 2>/dev/null \
-          | sort -h \
-          > vendor_sizes.txt
-
-          du -sh \
-          bootable/recovery \
-          vendor/omni/config \
-          device/alps/k50v1_64_bsp \
-          > project_sizes.txt
+          du -sh bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp 2>/dev/null > project_sizes.txt || true
+        working-directory: workspace
 
       - name: Añadir Variables TW y BOARD
         run: |
           set -e
           grep -R "TW_" bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp > tw_variables.txt || true
-          grep -R "BOARD_" \
-          device/alps/k50v1_64_bsp \
-          > board_variables.txt || true
+          grep -R "BOARD_" device/alps/k50v1_64_bsp > board_variables.txt || true
 
           {
-          echo "===== TW_EXTRA_LANGUAGES ====="
-          grep -R "TW_EXTRA_LANGUAGES" . || true
-
-          echo
-          echo "===== TW_INCLUDE_LANGUAGE_ZONE ====="
-          grep -R "TW_INCLUDE_LANGUAGE_ZONE" . || true
-
-          echo
-          echo "===== BOARD_INCLUDE_CMDLINE_TOOLS ====="
-          grep -R "BOARD_INCLUDE_CMDLINE_TOOLS" . || true
-
-          echo
-          echo "===== TW_INCLUDE_CRYPTO ====="
-          grep -R "TW_INCLUDE_CRYPTO" . || true
-
-          echo
-          echo "===== TW_INCLUDE_FBE ====="
-          grep -R "TW_INCLUDE_FBE" . || true
-
-          echo
-          echo "===== TW_INCLUDE_FBE_METADATA_DECRYPT ====="
-          grep -R "TW_INCLUDE_FBE_METADATA_DECRYPT" . || true
-
-          echo
-          echo "===== TW_EXCLUDE_TWRPAPP ====="
-          grep -R "TW_EXCLUDE_TWRPAPP" . || true
-          
-          echo
-          echo "===== TW_INCLUDE_NTFS ====="
-          grep -R "TW_INCLUDE_NTFS" . || true
-
-          echo
-          echo "===== TW_INCLUDE_EXFAT ====="
-          grep -R "TW_INCLUDE_EXFAT" . || true
-
+            echo "===== TW_EXTRA_LANGUAGES ====="
+            grep -R "TW_EXTRA_LANGUAGES" . || true
+            echo "===== TW_INCLUDE_LANGUAGE_ZONE ====="
+            grep -R "TW_INCLUDE_LANGUAGE_ZONE" . || true
+            echo "===== BOARD_INCLUDE_CMDLINE_TOOLS ====="
+            grep -R "BOARD_INCLUDE_CMDLINE_TOOLS" . || true
+            echo "===== TW_INCLUDE_CRYPTO ====="
+            grep -R "TW_INCLUDE_CRYPTO" . || true
+            echo "===== TW_INCLUDE_FBE ====="
+            grep -R "TW_INCLUDE_FBE" . || true
+            echo "===== TW_INCLUDE_FBE_METADATA_DECRYPT ====="
+            grep -R "TW_INCLUDE_FBE_METADATA_DECRYPT" . || true
+            echo "===== TW_EXCLUDE_TWRPAPP ====="
+            grep -R "TW_EXCLUDE_TWRPAPP" . || true
+            echo "===== TW_INCLUDE_NTFS ====="
+            grep -R "TW_INCLUDE_NTFS" . || true
+            echo "===== TW_INCLUDE_EXFAT ====="
+            grep -R "TW_INCLUDE_EXFAT" . || true
           } > important_flags.txt
-          working-directory: workspace
+        working-directory: workspace
+
 
       - name: Añadimos Búsquedas y Consolidación de Informes
         run: |
