@@ -21,7 +21,7 @@ jobs:
         run: |
           mkdir workspace
           cd workspace
-          # Inicialización con clonado superficial para ahorrar tiempo y gigas en el servidor
+          # Inicialización con la URL oficial corregida de la rama de desarrollo
           repo init --depth=1 -u https://github.com -b twrp-9.0
           # Sincronizamos estrictamente los directorios esenciales declarados para el estudio
           repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle
@@ -137,7 +137,6 @@ jobs:
       - name: Generar Mapa Inviolable de Firmas (SHA256 Manifest)
         run: |
           cd workspace
-          # Generamos el hash exclusivamente de los archivos útiles para el control estático
           find device/alps/k50v1_64_bsp/ -type f -exec sha256sum {} \; | sed 's|device/alps/k50v1_64_bsp/||' > ../analysis_report/sha256_manifest.txt
 
       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
@@ -165,9 +164,9 @@ jobs:
           cp -r build/make ../snapshot_source/build/ 2>/dev/null || true
           cp -r build/soong ../snapshot_source/build/ 2>/dev/null || true
           
-          # Copias quirúrgicas de librerías en la sección final de aislamiento
           cp -r external/libtar ../snapshot_source/external/ 2>/dev/null || true
           cp -r external/freetype ../snapshot_source/external/ 2>/dev/null || true
+
           cp -r external/libpng ../snapshot_source/external/ 2>/dev/null || true
 
       - name: Empaquetar Bloques Estructurados de Laboratorio
