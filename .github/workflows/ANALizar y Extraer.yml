@@ -154,8 +154,6 @@ jobs:
             echo "===== TW_INCLUDE_EXFAT ====="
             grep -R "TW_INCLUDE_EXFAT" . || true
           } > important_flags.txt
-        working-directory: workspace
-
 
       - name: Añadimos Búsquedas y Consolidación de Informes
         working-directory: workspace
