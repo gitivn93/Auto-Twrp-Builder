@@ -113,19 +113,18 @@ jobs:
       - name: Medir Tamaños
         working-directory: workspace
         run: |
-            echo "===== DIRECTORIO ACTUAL ====="
-            pwd
-            echo
-            echo "===== CONTENIDO ====="
-            ls -la
-            echo
-            echo "===== TAMAÑOS ====="
-            set -e
-            echo "===== BOOTABLE ====="
-            du -sh bootable/recovery/* 2>/dev/null | sort -h > recovery_sizes.txt
-            echo "===== VENDOR ====="
-            du -sh vendor/omni/config/* 2>/dev/null | sort -h > vendor_sizes.txt
-    
+          set -e
+          {
+            echo "===== BOOTABLE/RECOVERY ====="
+            du -sh bootable/recovery/* 2>/dev/null | sort -h
+          } > recovery_sizes.txt
+
+          {
+            echo "===== VENDOR/OMNI/CONFIG ====="
+            du -sh vendor/omni/config/* 2>/dev/null | sort -h
+          } > vendor_sizes.txt
+
+          du -sh bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp 2>/dev/null > project_sizes.txt || true
 
       - name: Añadir Variables TW y BOARD
         working-directory: workspace
