@@ -53,12 +53,13 @@ jobs:
           /usr/bin/repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni -b twrp-9.0
 
       - name: Repo Sync
+        working-directory: workspace 
         run: |
           export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
           /usr/bin/repo sync -j$(nproc --all) --force-sync
-        working-directory: workspace
 
       - name: Descargar y desempaquetar el Device Tree maestro
+        working-directory: workspace
         run: |      
           mkdir -p temp_tree
           gh release download lab-build-30973601644 \
@@ -69,10 +70,7 @@ jobs:
 
             echo "===== DEVICE TREE ====="
 
-            find device/alps/k50v1_64_bsp \
-            |maxdepth 2 \
-            |sort \
-            > device_tree_check.txt
+            find device/alps/k50v1_64_bsp -maxdepth 2 | sort > device_tree_check.txt
 
             echo "===== DEVICE TREE RESTAURADO ====="
             find device/alps/k50v1_64_bsp -maxdepth 2 | sort > device_tree_check.txt
@@ -96,7 +94,7 @@ jobs:
           cp -r bootable/recovery/minui* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
           
           if [ -d bootable/recovery/res ]; then
-            cp -r bootable/recovery/res ${GITHUB_WORKSPACE}/analysis_report/
+            cp -r bootable/recovery/res ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/
           fi
 
           cp bootable/recovery/twrp.cpp ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
@@ -113,22 +111,24 @@ jobs:
         working-directory: workspace
 
       - name: Medir Tamaños
-        run: |
-          set -e
-          {
-            echo "===== BOOTABLE/RECOVERY ====="
-            du -sh bootable/recovery/* 2>/dev/null | sort -h
-          } > recovery_sizes.txt
-
-          {
-            echo "===== VENDOR/OMNI/CONFIG ====="
-            du -sh vendor/omni/config/* 2>/dev/null | sort -h
-          } > vendor_sizes.txt
-
-          du -sh bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp 2>/dev/null > project_sizes.txt || true
         working-directory: workspace
+        run: |
+            echo "===== DIRECTORIO ACTUAL ====="
+            pwd
+            echo
+            echo "===== CONTENIDO ====="
+            ls -la
+            echo
+            echo "===== TAMAÑOS ====="
+            set -e
+            echo "===== BOOTABLE ====="
+            du -sh bootable/recovery/* 2>/dev/null | sort -h > recovery_sizes.txt
+            echo "===== VENDOR ====="
+            du -sh vendor/omni/config/* 2>/dev/null | sort -h > vendor_sizes.txt
+    
 
       - name: Añadir Variables TW y BOARD
+        working-directory: workspace
         run: |
           set -e
           grep -R "TW_" bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp > tw_variables.txt || true
@@ -158,6 +158,7 @@ jobs:
 
 
       - name: Añadimos Búsquedas y Consolidación de Informes
+        working-directory: workspace
         run: |
           set -e
           find bootable/recovery -type f -exec sha256sum {} \; > recovery_sha256.txt 2>/dev/null || true
@@ -168,7 +169,6 @@ jobs:
 
           # Copiamos todos los archivos de logs generados en los pasos previos a la carpeta central de informes
           find . -maxdepth 1 -name "*.txt" -exec cp {} ${GITHUB_WORKSPACE}/analysis_report/ \;
-          working-directory: workspace
           
 
       - name: Empaquetar Bloques Estructurados de Laboratorio
