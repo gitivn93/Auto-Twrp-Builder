@@ -79,30 +79,8 @@ jobs:
             exit 1
             fi
 
-      - name: Buscar Paquetes (Opcionales)
-        run: |
-         set -e
-
-          echo "===== BASH ====="
-          if [ -d external/bash ]; then
-          du -sh external/bash
-          find external/bash -type f -printf '%s %p\n' | sort -nr | head -30
-          else
-          echo "NO EXISTE external/bash"
-          fi
-
-          echo "===== NANO ====="
-          if [ -d external/nano ]; then
-          du -sh external/nano
-          find external/nano -type f -printf '%s %p\n' | sort -nr | head -30
-          else
-          echo "NO EXISTE external/nano"
-          fi
-
-          echo "===== PYTHON TWRP ====="
-          find . -type f \( \ -name '*python3_twrp*' -o \ -name '*python*' \ \) -print 2>/dev/null | sort
-
       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
+        working-directory: workspace
         run: |
           set -e
             # Estructuración limpia de rutas absolutas del sistema de snapshot
@@ -141,7 +119,6 @@ jobs:
 
             cp -r system/core/init ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
             cp -r system/core/fs_mgr ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
-            working-directory: workspace
 
       - name: Medir Tamaños
         working-directory: workspace
