@@ -1,4 +1,4 @@
-name: ANALizar y Extraer
+name: ANALizar y Extraer V2.0
 on:
   workflow_dispatch:
 
@@ -78,37 +78,70 @@ jobs:
             echo "ERROR: Device Tree no restaurado correctamente"
             exit 1
             fi
-          
+
+      - name: Buscar Paquetes (Opcionales)
+        run: |
+         set -e
+
+          echo "===== BASH ====="
+          if [ -d external/bash ]; then
+          du -sh external/bash
+          find external/bash -type f -printf '%s %p\n' | sort -nr | head -30
+          else
+          echo "NO EXISTE external/bash"
+          fi
+
+          echo "===== NANO ====="
+          if [ -d external/nano ]; then
+          du -sh external/nano
+          find external/nano -type f -printf '%s %p\n' | sort -nr | head -30
+          else
+          echo "NO EXISTE external/nano"
+          fi
+
+          echo "===== PYTHON TWRP ====="
+          find . -type f \( \ -name '*python3_twrp*' -o \ -name '*python*' \ \) -print 2>/dev/null | sort
 
       - name: Aislar Módulos Médula de TWRP (Source Snapshot)
         run: |
           set -e
-          # Estructuración limpia de rutas absolutas del sistema de snapshot
-          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery
-          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/vendor
-          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/build
-          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/external
-          mkdir -p ${GITHUB_WORKSPACE}/analysis_report
+            # Estructuración limpia de rutas absolutas del sistema de snapshot
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/vendor
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/build
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/external
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/system/core
+            mkdir -p ${GITHUB_WORKSPACE}/analysis_report
 
-          cp -r bootable/recovery/gui ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
-          cp -r bootable/recovery/minui* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
-          
-          if [ -d bootable/recovery/res ]; then
+            cp -r bootable/recovery/gui ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+            cp -r bootable/recovery/minui* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+
+            if [ -d bootable/recovery/res ]; then
             cp -r bootable/recovery/res ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/
-          fi
+            fi
 
-          cp bootable/recovery/twrp.cpp ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
-          cp bootable/recovery/variables.h ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
-          cp bootable/recovery/Android.* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
-          
-          cp -r vendor/omni ${GITHUB_WORKSPACE}/snapshot_source/vendor/ 2>/dev/null || true
-          cp -r build/make ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
-          cp -r build/soong ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
-          
-          cp -r external/libtar ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-          cp -r external/freetype ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-          cp -r external/libpng ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-        working-directory: workspace
+            cp bootable/recovery/twrp.cpp ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+            cp bootable/recovery/variables.h ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+            cp bootable/recovery/Android.* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+
+            cp -r vendor/omni ${GITHUB_WORKSPACE}/snapshot_source/vendor/ 2>/dev/null || true
+
+            cp -r build/make ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
+            cp -r build/soong ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
+
+            cp -r external/libtar ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/freetype ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/libpng ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+
+            cp -r external/bash ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/nano ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/toybox ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/zip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/unzip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+
+            cp -r system/core/init ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
+            cp -r system/core/fs_mgr ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
+            working-directory: workspace
 
       - name: Medir Tamaños
         working-directory: workspace
@@ -136,6 +169,39 @@ jobs:
           {
             echo "===== TW_EXTRA_LANGUAGES ====="
             grep -R "TW_EXTRA_LANGUAGES" . || true
+           
+
+            echo "===== TW_COSITAS_EXTRA ====="
+            grep -R "TW_EXCLUDE_BASH" . || true
+            grep -R "TW_EXCLUDE_PYTHON" . || true
+            grep -R "TW_EXCLUDE_NANO" . || true
+            grep -R "TW_EXCLUDE_ENCRYPTED_BACKUPS" . || true
+            grep -R "TW_NO_EXFAT" . || true
+            grep -R "TW_NO_EXFAT_FUSE" . || true
+            grep -R "TW_INCLUDE_NTFS_3G" . || true
+            grep -R "TW_INCLUDE_LOGCAT" . || true
+            grep -R "TW_USE_TOOLBOX" . || true
+            grep -R "BOARD_HAS_NO_REAL_SDCARD" . || true
+
+            echo "===== TW_INCLUDES_EXTRA ====="
+            grep -R "TW_INCLUDE_BASH" . || true
+            grep -R "TW_INCLUDE_PYTHON" . || true
+            grep -R "TW_INCLUDE_NANO" . || true
+            grep -R "TW_INCLUDE_ENCRYPTED_BACKUPS" . || true
+            grep -R "TW_INCLUDE_EXFAT" . || true
+            grep -R "TW_INCLUDE_NTFS" . || true
+            grep -R "TW_INCLUDE_CRYPTO" . || true
+            grep -R "TW_INCLUDE_FBE" . || true
+            grep -R "TW_INCLUDE_FBE_METADATA_DECRYPT" . || true
+            grep -R "TW_INCLUDE_MTP" . || true
+
+            echo "===== MODULOS TWRP ====="
+            grep -R "bash_twrp" bootable/recovery vendor external . 2>/dev/null || true
+            grep -R "nano_twrp" bootable/recovery vendor external . 2>/dev/null || true
+            grep -R "python3_twrp" bootable/recovery vendor external . 2>/dev/null || true
+            grep -R "openaes" bootable/recovery vendor external . 2>/dev/null || true
+            grep -R "sgdisk" bootable/recovery vendor external . 2>/dev/null || true
+         
             echo "===== TW_INCLUDE_LANGUAGE_ZONE ====="
             grep -R "TW_INCLUDE_LANGUAGE_ZONE" . || true
             echo "===== BOARD_INCLUDE_CMDLINE_TOOLS ====="
