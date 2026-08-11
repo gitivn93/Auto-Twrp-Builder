@@ -83,42 +83,48 @@ jobs:
         working-directory: workspace
         run: |
           set -e
-            # Estructuración limpia de rutas absolutas del sistema de snapshot
-            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery
-            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/vendor
-            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/build
-            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/external
-            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/system/core
-            mkdir -p ${GITHUB_WORKSPACE}/analysis_report
 
-            cp -r bootable/recovery/gui ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
-            cp -r bootable/recovery/minui* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+          echo "===== DEBUG SNAPSHOT STEP ====="
+          echo "PWD=$(pwd)"
+          echo "WORKSPACE=${GITHUB_WORKSPACE}"
+          echo "===== END DEBUG ====="
+          
+          # Estructuración limpia de rutas absolutas del sistema de snapshot
+          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery
+          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/vendor
+          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/build
+          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/external
+          mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/system/core
+          mkdir -p ${GITHUB_WORKSPACE}/analysis_report
 
-            if [ -d bootable/recovery/res ]; then
-            cp -r bootable/recovery/res ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/
-            fi
+          cp -r bootable/recovery/gui ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp -r bootable/recovery/minui* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
 
-            cp bootable/recovery/twrp.cpp ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
-            cp bootable/recovery/variables.h ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
-            cp bootable/recovery/Android.* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+          if [ -d bootable/recovery/res ]; then
+          cp -r bootable/recovery/res ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/
+          fi
 
-            cp -r vendor/omni ${GITHUB_WORKSPACE}/snapshot_source/vendor/ 2>/dev/null || true
+          cp bootable/recovery/twrp.cpp ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp bootable/recovery/variables.h ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+          cp bootable/recovery/Android.* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
 
-            cp -r build/make ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
-            cp -r build/soong ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
+          cp -r vendor/omni ${GITHUB_WORKSPACE}/snapshot_source/vendor/ 2>/dev/null || true
 
-            cp -r external/libtar ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-            cp -r external/freetype ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-            cp -r external/libpng ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r build/make ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
+          cp -r build/soong ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
+          
+          cp -r external/libtar ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r external/freetype ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r external/libpng ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
 
-            cp -r external/bash ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-            cp -r external/nano ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-            cp -r external/toybox ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-            cp -r external/zip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-            cp -r external/unzip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r external/bash ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r external/nano ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r external/toybox ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r external/zip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+          cp -r external/unzip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
 
-            cp -r system/core/init ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
-            cp -r system/core/fs_mgr ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
+          cp -r system/core/init ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
+          cp -r system/core/fs_mgr ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
 
       - name: Medir Tamaños
         working-directory: workspace
