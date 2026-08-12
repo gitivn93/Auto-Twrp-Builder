@@ -201,6 +201,15 @@ jobs:
             grep -R "TW_INCLUDE_NTFS" . || true
             echo "===== TW_INCLUDE_EXFAT ====="
             grep -R "TW_INCLUDE_EXFAT" . || true
+
+            echo "===== ORIGEN PYTHON3_TWRP ====="
+            grep -R "python3_twrp" bootable/recovery vendor external system build 2>/dev/null || true
+
+            echo "===== DEFINICION DEL MODULO PYTHON3_TWRP ====="
+            grep -R "LOCAL_MODULE.*python3_twrp" external vendor system build bootable/recovery 2>/dev/null || true
+
+            echo "===== REFERENCIAS PYTHON3 ====="
+            grep -R "python3_twrp" external vendor system build bootable/recovery 2>/dev/null || true
           } > important_flags.txt
 
       - name: Añadimos Búsquedas y Consolidación de Informes
@@ -215,7 +224,10 @@ jobs:
 
           # Copiamos todos los archivos de logs generados en los pasos previos a la carpeta central de informes
           find . -maxdepth 1 -name "*.txt" -exec cp {} ${GITHUB_WORKSPACE}/analysis_report/ \;
-          
+
+          find external vendor system -maxdepth 3 -type f -name "Android.mk" 2>/dev/null | sort
+          echo "===== ARTEFACTOS PYTHON ====="
+          find out -type f -name "*python3*" 2>/dev/null | sort
 
       - name: Empaquetar Bloques Estructurados de Laboratorio
         run: |
