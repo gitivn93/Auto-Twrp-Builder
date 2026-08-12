@@ -1,0 +1,233 @@
+name: ANALizar y Extraer V2.0
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    if: github.event.repository.owner.id == github.event.sender.id
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check Out
+        uses: actions/checkout@v4
+
+      - name: Prepare the environment
+        run: |
+          sudo apt update
+          sudo apt -y upgrade
+          
+          # Instalación de dependencias nativas del sistema operando bajo la máquina base
+          sudo apt -y install gperf gcc-multilib g++-multilib libc6-dev x11proto-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl2-dev libwxgtk3.2-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static python3 cpio wget build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev repo zip gh
+          
+          # Enlaces de compatibilidad para Clang Host
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncursesw.so.6 /usr/lib/x86_64-linux-gnu/libncursesw.so.5
+
+          # Configuración e inyección nativa del entorno de Python 2 con Pyenv
+          curl https://pyenv.run | bash
+          export PATH="$HOME/.pyenv/bin:$PATH"
+          eval "$(pyenv init -)"
+          pyenv install 2.7.18
+          pyenv global 2.7.18
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python
+          sudo ln -sf $HOME/.pyenv/versions/2.7.18/bin/python /usr/bin/python2
+          
+          pip3 install twrpdtgen --break-system-packages
+
+      - name: Install OpenJDK (JAVA JAVITAAAAAA)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+
+      - name: Initialize repo
+        id: pwd
+        run: |
+          mkdir workspace
+          cd workspace
+          echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
+          git config --global user.name "azwhikaru"
+          git config --global user.email "azwhikaru+37921907@github.com"
+          /usr/bin/repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni -b twrp-9.0
+
+      - name: Repo Sync
+        working-directory: workspace 
+        run: |
+          export PATH="$HOME/.pyenv/versions/2.7.18/bin:$PATH"
+          /usr/bin/repo sync -j$(nproc --all) --force-sync
+
+      - name: Descargar y desempaquetar el Device Tree maestro
+        working-directory: workspace
+        run: |      
+          mkdir -p temp_tree
+          gh release download lab-build-30973601644 \
+          --repo gitivn93/Auto-Twrp-Builder \
+          --pattern "Alps_device_tree_complete.tar.gz" \
+          --dir temp_tree
+            tar -xzf temp_tree/Alps_device_tree_complete.tar.gz
+
+            echo "===== DEVICE TREE ====="
+
+            find device/alps/k50v1_64_bsp -maxdepth 2 | sort > device_tree_check.txt
+
+            echo "===== DEVICE TREE RESTAURADO ====="
+            find device/alps/k50v1_64_bsp -maxdepth 2 | sort > device_tree_check.txt
+            if [ ! -f device/alps/k50v1_64_bsp/BoardConfig.mk ]; then
+            echo "ERROR: Device Tree no restaurado correctamente"
+            exit 1
+            fi
+
+      - name: Aislar Módulos Médula de TWRP (Source Snapshot)
+        working-directory: workspace
+        run: |
+          set -e
+            # Estructuración limpia de rutas absolutas del sistema de snapshot
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/vendor
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/build
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/external
+            mkdir -p ${GITHUB_WORKSPACE}/snapshot_source/system/core
+            mkdir -p ${GITHUB_WORKSPACE}/analysis_report
+
+            cp -r bootable/recovery/gui ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+            cp -r bootable/recovery/minui* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+
+            if [ -d bootable/recovery/res ]; then
+            cp -r bootable/recovery/res ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/
+            fi
+
+            cp bootable/recovery/twrp.cpp ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+            cp bootable/recovery/variables.h ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+            cp bootable/recovery/Android.* ${GITHUB_WORKSPACE}/snapshot_source/bootable/recovery/ 2>/dev/null || true
+
+            cp -r vendor/omni ${GITHUB_WORKSPACE}/snapshot_source/vendor/ 2>/dev/null || true
+
+            cp -r build/make ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
+            cp -r build/soong ${GITHUB_WORKSPACE}/snapshot_source/build/ 2>/dev/null || true
+
+            cp -r external/libtar ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/freetype ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/libpng ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+
+            cp -r external/bash ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/nano ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/toybox ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/zip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+            cp -r external/unzip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
+
+            cp -r system/core/init ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
+            cp -r system/core/fs_mgr ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
+
+      - name: Medir Tamaños
+        working-directory: workspace
+        run: |
+          set -e
+          {
+            echo "===== BOOTABLE/RECOVERY ====="
+            du -sh bootable/recovery/* 2>/dev/null | sort -h
+          } > recovery_sizes.txt
+
+          {
+            echo "===== VENDOR/OMNI/CONFIG ====="
+            du -sh vendor/omni/config/* 2>/dev/null | sort -h
+          } > vendor_sizes.txt
+
+          du -sh bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp 2>/dev/null > project_sizes.txt || true
+
+      - name: Añadir Variables TW y BOARD
+        working-directory: workspace
+        run: |
+          set -e
+          grep -R "TW_" bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp > tw_variables.txt || true
+          grep -R "BOARD_" device/alps/k50v1_64_bsp > board_variables.txt || true
+
+          {
+            echo "===== TW_EXTRA_LANGUAGES ====="
+            grep -R "TW_EXTRA_LANGUAGES" . || true
+           
+
+            echo "===== TW_COSITAS_EXTRA ====="
+            grep -R "TW_EXCLUDE_BASH" . || true
+            grep -R "TW_EXCLUDE_PYTHON" . || true
+            grep -R "TW_EXCLUDE_NANO" . || true
+            grep -R "TW_EXCLUDE_ENCRYPTED_BACKUPS" . || true
+            grep -R "TW_NO_EXFAT" . || true
+            grep -R "TW_NO_EXFAT_FUSE" . || true
+            grep -R "TW_INCLUDE_NTFS_3G" . || true
+            grep -R "TW_INCLUDE_LOGCAT" . || true
+            grep -R "TW_USE_TOOLBOX" . || true
+            grep -R "BOARD_HAS_NO_REAL_SDCARD" . || true
+
+            echo "===== TW_INCLUDES_EXTRA ====="
+            grep -R "TW_INCLUDE_BASH" . || true
+            grep -R "TW_INCLUDE_PYTHON" . || true
+            grep -R "TW_INCLUDE_NANO" . || true
+            grep -R "TW_INCLUDE_ENCRYPTED_BACKUPS" . || true
+            grep -R "TW_INCLUDE_EXFAT" . || true
+            grep -R "TW_INCLUDE_NTFS" . || true
+            grep -R "TW_INCLUDE_CRYPTO" . || true
+            grep -R "TW_INCLUDE_FBE" . || true
+            grep -R "TW_INCLUDE_FBE_METADATA_DECRYPT" . || true
+            grep -R "TW_INCLUDE_MTP" . || true
+
+            echo "===== MODULOS TWRP ====="
+            grep -R "bash_twrp" bootable/recovery vendor external . 2>/dev/null || true
+            grep -R "nano_twrp" bootable/recovery vendor external . 2>/dev/null || true
+            grep -R "python3_twrp" bootable/recovery vendor external . 2>/dev/null || true
+            grep -R "openaes" bootable/recovery vendor external . 2>/dev/null || true
+            grep -R "sgdisk" bootable/recovery vendor external . 2>/dev/null || true
+         
+            echo "===== TW_INCLUDE_LANGUAGE_ZONE ====="
+            grep -R "TW_INCLUDE_LANGUAGE_ZONE" . || true
+            echo "===== BOARD_INCLUDE_CMDLINE_TOOLS ====="
+            grep -R "BOARD_INCLUDE_CMDLINE_TOOLS" . || true
+            echo "===== TW_INCLUDE_CRYPTO ====="
+            grep -R "TW_INCLUDE_CRYPTO" . || true
+            echo "===== TW_INCLUDE_FBE ====="
+            grep -R "TW_INCLUDE_FBE" . || true
+            echo "===== TW_INCLUDE_FBE_METADATA_DECRYPT ====="
+            grep -R "TW_INCLUDE_FBE_METADATA_DECRYPT" . || true
+            echo "===== TW_EXCLUDE_TWRPAPP ====="
+            grep -R "TW_EXCLUDE_TWRPAPP" . || true
+            echo "===== TW_INCLUDE_NTFS ====="
+            grep -R "TW_INCLUDE_NTFS" . || true
+            echo "===== TW_INCLUDE_EXFAT ====="
+            grep -R "TW_INCLUDE_EXFAT" . || true
+          } > important_flags.txt
+
+      - name: Añadimos Búsquedas y Consolidación de Informes
+        working-directory: workspace
+        run: |
+          set -e
+          find bootable/recovery -type f -exec sha256sum {} \; > recovery_sha256.txt 2>/dev/null || true
+          find vendor/omni/config -type f -exec sha256sum {} \; > vendor_sha256.txt 2>/dev/null || true
+
+          find bootable/recovery -type f | sort > recovery_filelist.txt 2>/dev/null || true
+          find vendor/omni/config -type f | sort > vendor_filelist.txt 2>/dev/null || true
+
+          # Copiamos todos los archivos de logs generados en los pasos previos a la carpeta central de informes
+          find . -maxdepth 1 -name "*.txt" -exec cp {} ${GITHUB_WORKSPACE}/analysis_report/ \;
+          
+
+      - name: Empaquetar Bloques Estructurados de Laboratorio
+        run: |
+           tar -czf ${GITHUB_WORKSPACE}/analysis_logs.tar.gz -C ${GITHUB_WORKSPACE}/analysis_report .
+           tar -czf ${GITHUB_WORKSPACE}/source_snapshot.tar.gz -C ${GITHUB_WORKSPACE}/snapshot_source .
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+        
+      - name: Publicar Lanzamiento de Análisis en Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            analysis_logs.tar.gz
+            source_snapshot.tar.gz
+          name: LAB-ANALYSIS-ALPS-${{ github.run_id }}
+          tag_name: analysis-${{ github.run_id }}
+          body: |
+            Auditoría estructural completada con éxito.
+            Reportes completos de banderas, variables e integridad de hashes.
+            Captura aislada de los módulos core de TWRP lista para estudio local.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
