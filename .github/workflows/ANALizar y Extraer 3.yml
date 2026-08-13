@@ -122,7 +122,7 @@ jobs:
           cp -r external/toybox ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
           cp -r external/zip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
           cp -r external/unzip ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
-
+          cp -r external/python3 ${GITHUB_WORKSPACE}/snapshot_source/external/ 2>/dev/null || true
           cp -r system/core/init ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
           cp -r system/core/fs_mgr ${GITHUB_WORKSPACE}/snapshot_source/system/core/ 2>/dev/null || true
 
@@ -141,7 +141,9 @@ jobs:
           } > vendor_sizes.txt
 
           du -sh bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp 2>/dev/null > project_sizes.txt || true
-
+          echo "===== TAMAÑO PYTHON3 ====="
+          du -sh external/python3 2>/dev/null >> proyect_sizes.txt || true
+          
       - name: Añadir Variables TW y BOARD
         working-directory: workspace
         run: |
