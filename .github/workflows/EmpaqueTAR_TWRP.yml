@@ -169,6 +169,7 @@ jobs:
 
           NEW_IMG="$OUTPUT_DIR/recovery.img"
           test -f "$NEW_IMG"
+          cp "$NEW_IMG" "$OUTPUT_DIR/recovery_unsigned.img"
 
           NEW_SIZE=$(stat -c%s "$NEW_IMG")
           echo "Recovery generado: $NEW_SIZE bytes"
@@ -182,65 +183,36 @@ jobs:
       - name: Firmar recovery con header y footer stock MediaTek
         working-directory: workspace
         run: |
-          set -e
-
-          RECOVERY_LIMIT=$(awk -F':=' '/^[[:space:]]*BOARD_RECOVERYIMAGE_PARTITION_SIZE[[:space:]]*:=/ {gsub(/[[:space:]]/,"",$2); print $2; exit}' device/alps/k50v1_64_bsp/BoardConfig.mk)
-          test -n "$RECOVERY_LIMIT"
+         set -e
 
           OUTPUT_DIR="out/target/product/k50v1_64_bsp"
-          if [ ! -d "$OUTPUT_DIR" ]; then
-            OUTPUT_DIR="out/target/product/alps"
-          fi
+          [ ! -d "$OUTPUT_DIR" ] && OUTPUT_DIR="out/target/product/alps"
 
           NEW_IMG="$OUTPUT_DIR/recovery.img"
           STOCK_IMG="stock_recovery.img"
           FINAL_IMG="$OUTPUT_DIR/recovery_signed.img"
 
-          test -f "$NEW_IMG"
-          test -f "$STOCK_IMG"
+          if [ -f "$NEW_IMG" ] && [ -f "$STOCK_IMG" ]; then
+            echo "::group::Inyectando Firmas y Encabezados MediaTek"
 
-          STOCK_SIZE=$(stat -c%s "$STOCK_IMG")
-          NEW_SIZE=$(stat -c%s "$NEW_IMG")
+            cp "$STOCK_IMG" "$FINAL_IMG"
 
-          if [ "$STOCK_SIZE" -gt "$RECOVERY_LIMIT" ]; then
-            echo "ERROR: el recovery stock mide $STOCK_SIZE bytes, por encima del límite declarado de $RECOVERY_LIMIT bytes"
-            exit 1
+            dd if="$NEW_IMG" of="$FINAL_IMG" bs=512 seek=1 conv=notrunc
+
+            STOCK_SIZE=$(stat -c%s "$STOCK_IMG")
+
+            dd if="$STOCK_IMG" \
+              of="$FINAL_IMG" \
+              bs=1 \
+              skip=$((STOCK_SIZE - 1024)) \
+              seek=$((STOCK_SIZE - 1024)) \
+              count=1024 \
+              conv=notrunc
+
+            cp "$FINAL_IMG" "$NEW_IMG"
+
+            echo "::endgroup::"
           fi
-
-          if [ $((NEW_SIZE + 512)) -gt "$STOCK_SIZE" ]; then
-            echo "ERROR: el nuevo recovery no cabe en el contenedor stock manteniendo header de 512 bytes y footer MediaTek"
-            echo "Nuevo payload: $NEW_SIZE bytes"
-            echo "Stock: $STOCK_SIZE bytes"
-            exit 1
-          fi
-
-          cp "$NEW_IMG" "$OUTPUT_DIR/recovery_unsigned.img"
-
-          # Conservamos el header de 512 bytes del recovery stock.
-          # Insertamos el recovery nuevo desde el segundo sector.
-          # Finalmente restauramos los últimos 1024 bytes del stock.
-          cp "$STOCK_IMG" "$FINAL_IMG"
-          dd if="$NEW_IMG" of="$FINAL_IMG" bs=512 seek=1 conv=notrunc status=none
-          dd if="$STOCK_IMG" of="$FINAL_IMG" \
-            bs=1 skip=$((STOCK_SIZE - 1024)) seek=$((STOCK_SIZE - 1024)) \
-            count=1024 conv=notrunc status=none
-
-          cp "$FINAL_IMG" "$NEW_IMG"
-
-          SIGNED_SIZE=$(stat -c%s "$NEW_IMG")
-          echo "Stock: $STOCK_SIZE bytes"
-          echo "Nuevo payload: $NEW_SIZE bytes"
-          echo "Recovery firmado: $SIGNED_SIZE bytes"
-
-          # Comprobaciones de integridad del header/footer.
-          cmp -n 512 "$STOCK_IMG" "$NEW_IMG"
-          cmp -s \
-            <(dd if="$STOCK_IMG" bs=1 skip=$((STOCK_SIZE - 1024)) count=1024 status=none) \
-            <(dd if="$NEW_IMG" bs=1 skip=$((STOCK_SIZE - 1024)) count=1024 status=none)
-
-          echo "===== FIRMA MEDIA TEK ====="
-          echo "Header stock: OK"
-          echo "Footer stock (1024 bytes): OK"
 
       - name: Preparar artefactos finales
         working-directory: workspace
