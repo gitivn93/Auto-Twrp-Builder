@@ -1,4 +1,4 @@
-name: ANALizar y Extraer V3.0
+name: ANALizar y Extraer V4.0
 on:
   workflow_dispatch:
 
@@ -143,6 +143,10 @@ jobs:
           du -sh bootable/recovery vendor/omni/config device/alps/k50v1_64_bsp 2>/dev/null > project_sizes.txt || true
           echo "===== TAMAÑO PYTHON3 ====="
           du -sh external/python3 2>/dev/null >> proyect_sizes.txt || true
+          echo "===== TAMAÑO BASH ====="
+          du -sh external/bash 2>/dev/null >> project_sizes.txt || true
+          echo "===== TAMAÑO NANO ====="
+          du -sh external/nano 2>/dev/null >> project_sizes.txt || true
           
       - name: Añadir Variables TW y BOARD
         working-directory: workspace
@@ -212,6 +216,12 @@ jobs:
 
             echo "===== REFERENCIAS PYTHON3 ====="
             grep -R "python3_twrp" external vendor system build bootable/recovery 2>/dev/null || true
+
+            echo "===== ANDROID.MK BASH ====="
+            grep -n -A80 -B10 "bash_twrp" external/bash/Android.mk 2>/dev/null || true
+
+            echo "===== ANDROID.MK NANO ====="
+            grep -n -A80 -B10 "nano_twrp" external/nano/Android.mk 2>/dev/null || true
           } > important_flags.txt
 
       - name: Añadimos Búsquedas y Consolidación de Informes
