@@ -7,15 +7,9 @@ on:
         description: 'URL directa del recovery.img stock usado para preservar header/footer MediaTek'
         required: true
         type: string
-      DEVICE_TREE_RELEASE_TAG:
-        description: 'Tag del Release que contiene el Device Tree modificado'
-        required: true
-        type: string
-      DEVICE_TREE_ASSET:
-        description: 'Nombre exacto del .tar.gz del Device Tree modificado'
-        required: false
-        default: 'Alps_device_tree_complete.tar.gz'
-        type: string
+        env:
+      DEVICE_TREE_RELEASE_TAG: lab-build-30973601644
+      DEVICE_TREE_ASSET: Alps_device_tree_complete.tar.gz
       MANIFEST_URL:
         description: 'URL del manifest TWRP'
         required: false
@@ -106,10 +100,10 @@ jobs:
           rm -rf temp_tree
           mkdir -p temp_tree
 
-          gh release download "${{ github.event.inputs.DEVICE_TREE_RELEASE_TAG }}" \
-            --repo gitivn93/Auto-Twrp-Builder \
-            --pattern "${{ github.event.inputs.DEVICE_TREE_ASSET }}" \
-            --dir temp_tree
+          gh release download "${{ env.DEVICE_TREE_RELEASE_TAG }}" \
+          --repo gitivn93/Auto-Twrp-Builder \
+          --pattern "${{ env.DEVICE_TREE_ASSET }}" \
+          --dir temp_tree
 
           test -f "temp_tree/${{ github.event.inputs.DEVICE_TREE_ASSET }}"
           tar -xzf "temp_tree/${{ github.event.inputs.DEVICE_TREE_ASSET }}"
