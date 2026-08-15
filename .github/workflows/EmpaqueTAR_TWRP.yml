@@ -7,9 +7,6 @@ on:
         description: 'URL directa del recovery.img stock usado para preservar header/footer MediaTek'
         required: true
         type: string
-        env:
-      DEVICE_TREE_RELEASE_TAG: lab-build-30973601644
-      DEVICE_TREE_ASSET: Alps_device_tree_complete.tar.gz
       MANIFEST_URL:
         description: 'URL del manifest TWRP'
         required: false
@@ -25,6 +22,10 @@ on:
         required: false
         default: 'recovery'
         type: string
+
+env:
+  DEVICE_TREE_RELEASE_TAG: lab-build-30973601644
+  DEVICE_TREE_ASSET: Alps_device_tree_complete.tar.gz
 
 jobs:
   build:
