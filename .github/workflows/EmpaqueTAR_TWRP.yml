@@ -106,8 +106,8 @@ jobs:
           --pattern "${{ env.DEVICE_TREE_ASSET }}" \
           --dir temp_tree
 
-          test -f "temp_tree/${{ github.event.inputs.DEVICE_TREE_ASSET }}"
-          tar -xzf "temp_tree/${{ github.event.inputs.DEVICE_TREE_ASSET }}"
+          test -f "temp_tree/${{ env.DEVICE_TREE_ASSET }}"
+          tar -xzf "temp_tree/${{ env.DEVICE_TREE_ASSET }}"
           rm -rf temp_tree
 
           test -f device/alps/k50v1_64_bsp/BoardConfig.mk
